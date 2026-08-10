@@ -3,9 +3,9 @@ package net.torocraft.flighthud;
 //? if fabric && <1.20 {
 /*import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 *///?} elif fabric && <1.21.2 {
-/*import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.gui.GuiGraphics;
-*///?} elif fabric && >=26.1 {
+//?} elif fabric && >=26.1 {
 /*import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -20,10 +20,10 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.common.NeoForge;
 *///?} elif forge && <1.19 {
-import com.mojang.blaze3d.vertex.PoseStack;
+/*import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraftforge.client.gui.ForgeIngameGui;
 import net.minecraftforge.client.gui.OverlayRegistry;
-//?} elif forge && <1.20 {
+*///?} elif forge && <1.20 {
 /*import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraftforge.client.event.RegisterGuiOverlaysEvent;
 import net.minecraftforge.client.gui.overlay.ForgeGui;
@@ -66,9 +66,9 @@ public final class HudHooks {
     /*HudRenderCallback.EVENT.register((poseStack, tickDelta) ->
         HUD.render(new PlatformCanvas(poseStack), tickDelta, Minecraft.getInstance()));
     *///?} elif fabric && <1.21.2 {
-    /*HudRenderCallback.EVENT.register((GuiGraphics context, float tickDelta) ->
+    HudRenderCallback.EVENT.register((GuiGraphics context, float tickDelta) ->
         HUD.render(new PlatformCanvas(context), tickDelta, Minecraft.getInstance()));
-    *///?} elif fabric && >=26.1 {
+    //?} elif fabric && >=26.1 {
     /*HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("flighthud", "hud"),
         (GuiGraphicsExtractor context, DeltaTracker deltaTracker) ->
             HUD.render(new PlatformCanvas(context),
@@ -82,10 +82,10 @@ public final class HudHooks {
         HUD.render(new PlatformCanvas(event.getGuiGraphics()),
             event.getPartialTick().getGameTimeDeltaPartialTick(false), Minecraft.getInstance()));
     *///?} elif forge && <1.19 {
-    OverlayRegistry.registerOverlayTop("flighthud",
+    /*OverlayRegistry.registerOverlayTop("flighthud",
         (ForgeIngameGui gui, PoseStack poseStack, float tickDelta, int width, int height) ->
             HUD.render(new PlatformCanvas(poseStack), tickDelta, Minecraft.getInstance()));
-    //?}
+    *///?}
     // forge>=1.19 is intentionally absent here: RegisterGuiOverlaysEvent must be
     // registered on the mod event bus at construction time, not called
     // imperatively -- see registerOverlays(...) below and its wiring in

@@ -56,12 +56,12 @@ public class HudConfig implements IConfig {
     updateColor();
   }
 
+  // No try/catch here: unlike updateColor() below, float division can never
+  // throw in Java (unlike int division by zero), so a catch block around it
+  // would be dead code -- removed during the Phase 2 test-coverage pass
+  // rather than kept just to pad a defensive-programming appearance.
   private void updateThickness() {
-    try {
-      halfThickness = thickness / 2;
-    } catch (Exception e) {
-      halfThickness = 0.5f;
-    }
+    halfThickness = thickness / 2;
   }
 
   private void updateColor() {

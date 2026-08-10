@@ -1,7 +1,5 @@
 package net.torocraft.flighthud.config;
 
-import net.minecraft.client.Minecraft;
-import net.torocraft.flighthud.FlightHud;
 import net.torocraft.flighthud.config.loader.IConfig;
 
 public class SettingsConfig implements IConfig {
@@ -32,16 +30,20 @@ public class SettingsConfig implements IConfig {
     return DisplayMode.values()[i].toString();
   }
 
-  public void toggleDisplayMode() {
-    Minecraft client = Minecraft.getInstance();
-
-    if (client.player.isFallFlying()) {
+  /**
+   * Pure state mutation, deliberately split from the live-game orchestration
+   * (reading {@code Minecraft.getInstance().player.isFallFlying()} and
+   * persisting via {@code FlightHud.CONFIG_LOADER_SETTINGS.save(this)}) so
+   * this method is unit-testable headless. Callers ({@code FlightHud}'s
+   * {@code onClientTick()} and {@code SwitchDisplayModeCommand.run()}) own
+   * both of those Minecraft-touching steps.
+   */
+  public void toggleDisplayMode(boolean isFallFlying) {
+    if (isFallFlying) {
       displayModeWhenFlying = toggle(displayModeWhenFlying);
     } else {
       displayModeWhenNotFlying = toggle(displayModeWhenNotFlying);
     }
-
-    FlightHud.CONFIG_LOADER_SETTINGS.save(this);
   }
 
   public static DisplayMode parseDisplayMode(String s) {

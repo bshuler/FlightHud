@@ -34,10 +34,10 @@ public class Dimensions {
     // Options.fov() is an OptionInstance<Integer> from 1.19.4 on; 1.18.2 still
     // has it as a plain double field (confirmed via javap against both jars).
     //? if <1.19 {
-    degreesPerPixel = hScreen / (float) client.options.fov;
-    //?} else {
-    /*degreesPerPixel = hScreen / client.options.fov().get();
-    *///?}
+    /*degreesPerPixel = hScreen / (float) client.options.fov;
+    *///?} else {
+    degreesPerPixel = hScreen / client.options.fov().get();
+    //?}
     xMid = wScreen / 2;
     yMid = hScreen / 2;
 

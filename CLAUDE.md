@@ -224,14 +224,54 @@ and `settings.gradle.kts` together aren't enough context.
 ### Build commands
 
 ```bash
-./gradlew chiseledBuild           # build every configured version/loader node
-./gradlew :1.20.1-fabric:build    # build a single node
-./gradlew test                    # run JVM unit tests (version-agnostic logic only)
-./gradlew runClient               # run the client for the "active" node (not required for CI)
+./gradlew chiseledBuild                       # build every configured version/loader node
+./gradlew :1.20.1-fabric:build                 # build a single node
+./gradlew test                                 # run JVM unit tests against the ACTIVE node only
+./gradlew jacocoTestReport                     # generate the HTML/XML coverage report
+./gradlew check                                # test + coverage-verification gate (see below)
+./gradlew runClient                            # run the client for the "active" node (not required for CI)
 ```
 
 Compile/build green (`chiseledBuild`) is the acceptance bar for this program —
 launching the game client is not required to consider a cell "done."
+
+### Testing & coverage (JaCoCo)
+
+JUnit 5 + JaCoCo are wired into `build.gradle.kts`, mirroring the canonical
+pattern from the sibling `critical-orientation`/`critical-flight-details`
+repos (including the NeoForge `junit-fml`/`mainargs.txt` classpath-exclusion
+guard, gated `if (mod.isNeoforge)`). Tests run against whichever Stonecutter
+node is currently `active` — **never** across the full matrix, and never by
+hand-toggling `//? if` markers to reach another node's code.
+
+`tasks.check` depends on `jacocoTestCoverageVerification`, which enforces
+`LINE COVEREDRATIO 1.00` (100%) over the classes below. This is a real,
+enforced gate, not aspirational — `./gradlew check` fails the build if
+coverage regresses.
+
+**Coverage scope** (see `PLAN.md` "Phase 5" for the full class-by-class
+breakdown, refactors, and the one dead-code bug this pass found):
+
+| In scope (tested to 100%) | Excluded (documented reason in `PLAN.md`) |
+|---|---|
+| `config.SettingsConfig` (+ `$DisplayMode`) | `FlightHud` — loader entrypoint, live singletons |
+| `config.HudConfig` | `HudHooks` — live per-loader render-hook registration |
+| `FlightComputerMath` | `PlatformCanvas` — wraps live rendering primitives |
+| `config.loader.ConfigLoader` | `HudComponent`, `HudRenderer` — render straight to `FlightCanvas` |
+| `config.loader.FileWatcher` | `Dimensions` — reads live `Window`/`Options` state |
+| | `FlightComputer` — thin wrapper over live `Vec3`/`Entity`, delegates to `FlightComputerMath` |
+| | `SwitchDisplayModeCommand` — needs a live command-dispatch context |
+| | `components/**` (7 classes) — render straight to `FlightCanvas` |
+| | `config.loader.ConfigFolder` — one-liner over the live loader singleton |
+
+`ConfigLoader` and `FileWatcher` are pure enough to unit test headless
+specifically because they take a plain `java.io.File` and don't touch any
+loader singleton themselves — that resolution lives at the `FlightHud.java`
+call site instead (excluded, per above). `FileWatcher`'s full `run()`
+lifecycle is exercised against a **real** `WatchService`/filesystem write in
+addition to hand-rolled fakes for the pure `pollEvents()` branch logic — see
+`FileWatcherTest.java`'s class doc for why the fakes alone weren't enough to
+reach 100%.
 
 ## Version matrix
 

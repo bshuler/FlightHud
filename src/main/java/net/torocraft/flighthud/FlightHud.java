@@ -1,29 +1,32 @@
 package net.torocraft.flighthud;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import java.io.File;
 import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
 import net.torocraft.flighthud.config.HudConfig;
 import net.torocraft.flighthud.config.SettingsConfig;
+import net.torocraft.flighthud.config.loader.ConfigFolder;
 import net.torocraft.flighthud.config.loader.ConfigLoader;
 import org.lwjgl.glfw.GLFW;
 
 //? if fabric {
-/*import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-*///?} elif neoforge {
+//?} elif neoforge {
 /*import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.common.NeoForge;
 *///?} elif forge && <1.19 {
-import net.minecraftforge.client.ClientRegistry;
+/*import net.minecraftforge.client.ClientRegistry;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-//?} elif forge {
+*///?} elif forge {
 /*import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
@@ -35,8 +38,8 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 //? if fabric && >=26.1 {
 /*import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 *///?} elif fabric {
-/*import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-*///?}
+import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+//?}
 
 // The Fabric client command API (v2) doesn't exist at all in 1.18.2's Fabric
 // API bundle (confirmed: no fabric-command-api-v2 artifact resolves for that
@@ -48,9 +51,9 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 /*import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 *///?} elif fabric && >=1.19 {
-/*import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
-*///?}
+//?}
 
 // KeyMapping's 4th constructor argument changed from a plain String to a proper
 // KeyMapping.Category record type starting at MC 1.21.9 (confirmed via javap across
@@ -73,14 +76,14 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallba
  * mixin/InGameHudMixin.java} -- see HudHooks' class doc for why).
  */
 //? if fabric {
-/*public class FlightHud implements ClientModInitializer {
-*///?} elif neoforge {
+public class FlightHud implements ClientModInitializer {
+//?} elif neoforge {
 /*@Mod(FlightHud.MODID)
 public class FlightHud {
 *///?} elif forge {
-@Mod(FlightHud.MODID)
+/*@Mod(FlightHud.MODID)
 public class FlightHud {
-//?}
+*///?}
   public static final String MODID = "flighthud";
 
   public static SettingsConfig CONFIG_SETTINGS = new SettingsConfig();
@@ -89,17 +92,17 @@ public class FlightHud {
 
   public static ConfigLoader<SettingsConfig> CONFIG_LOADER_SETTINGS = new ConfigLoader<>(
       new SettingsConfig(),
-      FlightHud.MODID + ".settings.json",
+      new File(ConfigFolder.get(), FlightHud.MODID + ".settings.json"),
       config -> FlightHud.CONFIG_SETTINGS = config);
 
   public static ConfigLoader<HudConfig> CONFIG_LOADER_FULL = new ConfigLoader<>(
       new HudConfig(),
-      FlightHud.MODID + ".full.json",
+      new File(ConfigFolder.get(), FlightHud.MODID + ".full.json"),
       config -> FlightHud.CONFIG_FULL = config);
 
   public static ConfigLoader<HudConfig> CONFIG_LOADER_MIN = new ConfigLoader<>(
       HudConfig.getDefaultMinSettings(),
-      FlightHud.MODID + ".min.json",
+      new File(ConfigFolder.get(), FlightHud.MODID + ".min.json"),
       config -> FlightHud.CONFIG_MIN = config);
 
   //? if >=1.21.11 {
@@ -115,16 +118,16 @@ public class FlightHud {
   private static KeyMapping keyBinding;
 
   //? if fabric {
-  /*@Override
+  @Override
   public void onInitializeClient() {
     loadConfig();
     setupKeyCode();
     //? if >=1.19 {
-    /^setupCommand();
-    ^///?}
+    setupCommand();
+    //?}
     HudHooks.register();
   }
-  *///?} elif neoforge {
+  //?} elif neoforge {
   /*public FlightHud(IEventBus modEventBus) {
     loadConfig();
     modEventBus.addListener(this::onRegisterKeyMappings);
@@ -137,7 +140,7 @@ public class FlightHud {
     event.register(keyBinding);
   }
   *///?} elif forge && <1.19 {
-  public FlightHud() {
+  /*public FlightHud() {
     FMLJavaModLoadingContext.get().getModEventBus().addListener(this::onClientSetup);
   }
 
@@ -154,7 +157,7 @@ public class FlightHud {
       onClientTick();
     }
   }
-  //?} elif forge {
+  *///?} elif forge {
   /*public FlightHud() {
     FMLJavaModLoadingContext.get().getModEventBus().addListener(this::onClientSetup);
     FMLJavaModLoadingContext.get().getModEventBus().addListener(this::onRegisterKeyMappings);
@@ -191,31 +194,32 @@ public class FlightHud {
     //? if fabric && >=26.1 {
     /*KeyMappingHelper.registerKeyMapping(keyBinding);
     *///?} elif fabric {
-    /*KeyBindingHelper.registerKeyBinding(keyBinding);
-    *///?}
+    KeyBindingHelper.registerKeyBinding(keyBinding);
+    //?}
 
     //? if fabric {
-    /*ClientTickEvents.END_CLIENT_TICK.register(client -> onClientTick());
-    *///?}
+    ClientTickEvents.END_CLIENT_TICK.register(client -> onClientTick());
+    //?}
   }
 
   private static void onClientTick() {
     while (keyBinding.consumeClick()) {
-      CONFIG_SETTINGS.toggleDisplayMode();
+      CONFIG_SETTINGS.toggleDisplayMode(Minecraft.getInstance().player.isFallFlying());
+      CONFIG_LOADER_SETTINGS.save(CONFIG_SETTINGS);
     }
   }
 
   //? if fabric && >=1.19 {
-  /*private static void setupCommand() {
+  private static void setupCommand() {
     ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
       //? if >=26.1 {
-      /^dispatcher.register(ClientCommands.literal("flighthud")
+      /*dispatcher.register(ClientCommands.literal("flighthud")
           .then(ClientCommands.literal("toggle").executes(new SwitchDisplayModeCommand())));
-      ^///?} else {
+      *///?} else {
       dispatcher.register(ClientCommandManager.literal("flighthud")
           .then(ClientCommandManager.literal("toggle").executes(new SwitchDisplayModeCommand())));
       //?}
     });
   }
-  *///?}
+  //?}
 }

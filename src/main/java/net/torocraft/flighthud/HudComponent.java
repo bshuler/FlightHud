@@ -9,7 +9,7 @@ public abstract class HudComponent {
   public static HudConfig CONFIG;
 
   protected int i(double d) {
-    return (int) Math.round(d);
+    return FlightComputerMath.roundHalfUp(d);
   }
 
   protected void drawPointer(FlightCanvas context, float x, float y, float rot) {
@@ -22,11 +22,7 @@ public abstract class HudComponent {
   }
 
   protected float wrapHeading(float degrees) {
-    degrees = degrees % 360;
-    while (degrees < 0) {
-      degrees += 360;
-    }
-    return degrees;
+    return FlightComputerMath.wrapHeading(degrees);
   }
 
   protected void drawFont(Minecraft mc, FlightCanvas context, String s, float x, float y) {

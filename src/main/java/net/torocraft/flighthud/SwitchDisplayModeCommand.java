@@ -6,17 +6,19 @@ package net.torocraft.flighthud;
 // "Multi-loader scope decisions". On non-fabric nodes this whole file compiles
 // down to just the package statement (a valid, empty compilation unit).
 //? if fabric && >=1.19 {
-/*import com.mojang.brigadier.Command;
+import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.minecraft.client.Minecraft;
 
 public class SwitchDisplayModeCommand implements Command<FabricClientCommandSource> {
 
   @Override
   public int run(CommandContext<FabricClientCommandSource> context) {
-    FlightHud.CONFIG_SETTINGS.toggleDisplayMode();
+    FlightHud.CONFIG_SETTINGS.toggleDisplayMode(Minecraft.getInstance().player.isFallFlying());
+    FlightHud.CONFIG_LOADER_SETTINGS.save(FlightHud.CONFIG_SETTINGS);
     return 0;
   }
 
 }
-*///?}
+//?}

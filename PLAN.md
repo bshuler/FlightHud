@@ -364,6 +364,140 @@ produces regardless of whether Forgix succeeds).
 - [x] PLAN.md status table fully updated (this pass)
 - [x] Final commit(s) pushed to `origin/main` (`cb35342`, `e6a07c0`, `925ecea`)
 
+## Phase 5 — Test coverage + Folia (2026-08-10, Phase 2 follow-up brief)
+
+### Folia compatibility
+
+**Folia n/a — client mod.** Folia is a server-side Paper fork that
+parallelizes region/chunk processing across threads; FlightHud is a
+client-only mod (Fabric `ClientModInitializer` / NeoForge+Forge client-setup
+entrypoints, HUD rendering, local JSON config) with zero server-side code.
+Folia compatibility does not apply. No further investigation performed, per
+the repo-specific brief override for this mod.
+
+### Test coverage: 100% line coverage, enforced
+
+JUnit 5 (`org.junit.jupiter:junit-jupiter:5.10.2`) + JaCoCo wired into
+`build.gradle.kts` (mirroring the canonical wiring already landed in
+`critical-orientation`/`critical-flight-details`, including the
+NeoForge `junit-fml` classpath-exclusion guard). `jacocoTestCoverageVerification`
+enforces `LINE COVEREDRATIO 1.00`; `tasks.check` depends on it. All tests run
+against the active Stonecutter cell (`1.20.1-fabric`) only — never across the
+matrix, never by hand-toggling `//? if` markers.
+
+**Included/tested classes — 176/176 lines (100%):**
+
+| Class | Lines covered |
+|---|---|
+| `config.SettingsConfig` | 19/19 |
+| `config.SettingsConfig$DisplayMode` | 2/2 |
+| `config.HudConfig` | 60/60 |
+| `FlightComputerMath` | 27/27 |
+| `config.loader.ConfigLoader` | 33/33 |
+| `config.loader.FileWatcher` | 35/35 |
+| **Total** | **176/176** |
+
+Every test asserts real behavior (state transitions, computed values,
+exception-swallowing branches actually exercised) — no "constructs without
+throwing" placeholders, no reflection hacks to inflate coverage.
+`FileWatcher`'s `run()`/`watch()`/`stop()`/`isRunning()` lifecycle is
+exercised against a **real** `java.nio.file.WatchService` (a real filesystem
+write is made and awaited, bounded by an in-test polling helper, not agent
+session polling) in addition to hand-rolled `WatchService`/`WatchKey`/
+`WatchEvent` fakes for the pure `pollEvents()` branch logic — a purely
+fake/interrupt-driven test left 2 lines of `run()`'s while-loop uncovered,
+so a genuine filesystem-event-delivery test was added to close the gap
+honestly rather than fudging it.
+
+**Excluded classes — one honest reason each, not a blanket exclusion:**
+
+| Class | Why untestable headless |
+|---|---|
+| `FlightHud`, `FlightHud$*` | Loader entrypoint (`ClientModInitializer`/`@Mod`); touches live `KeyMapping`, `Minecraft.getInstance()`, and per-loader event buses that only exist inside a running game. |
+| `HudHooks`, `HudHooks$*` | Registers directly against each loader's live HUD-render event bus/registry (`HudElementRegistry`, `RenderGuiEvent`, `OverlayRegistry`, etc.) — nothing to invoke without a running game client. |
+| `PlatformCanvas`, `PlatformCanvas$*` | Thin wrapper directly over `GuiGraphics`/`PoseStack`/`GuiGraphicsExtractor` rendering primitives, none of which exist headless. |
+| `HudComponent`, `HudComponent$*` | Drawing primitives call straight through to `FlightCanvas` (backed by the real renderer); no independently assertable logic beyond "did it call the mock." |
+| `HudRenderer`, `HudRenderer$*` | Top-level render dispatcher with the same live-rendering dependency as `HudComponent`. |
+| `Dimensions`, `Dimensions$*` | Reads live `Window`/`Options` screen-space state (`Options.fov()`, `Window.getGuiScaledWidth()`) that only exists inside a running game. |
+| `FlightComputer`, `FlightComputer$*` | Thin Minecraft-touching wrapper pulling primitives off live `Vec3`/`Entity` objects and delegating to `FlightComputerMath` (which IS fully tested) — no logic of its own beyond field access on live game objects. |
+| `SwitchDisplayModeCommand`, `SwitchDisplayModeCommand$*` | Brigadier command typed against `FabricClientCommandSource`; needs a live command-dispatch context. |
+| `components/**` (7 classes) | Every HUD element renders directly against `FlightCanvas`/live game state — identical rationale to `HudComponent`. |
+| `config.loader.ConfigFolder`, `$*` | One-liner wrapping `FabricLoader.getInstance()`/`FMLPaths.CONFIGDIR.get()`, which only exist inside a running game/loader; nothing to assert beyond "calls a static loader singleton." |
+
+**Refactors made in service of testability (behavior-preserving, no hacks):**
+- `ConfigLoader`'s old public String-filename constructor (which internally
+  resolved `ConfigFolder.get()`, touching the live loader singleton) was
+  **removed outright** rather than test-seamed — the File-based constructor
+  is now the sole public constructor, and the loader-touching resolution
+  moved to the call site in `FlightHud.java` (already wholesale-excluded).
+  This is a genuine decoupling refactor, following the same "extract pure
+  logic away from loader-touching orchestration" precedent already used for
+  `FlightComputerMath`/`SettingsConfig.toggleDisplayMode`, not a
+  coverage-inflation trick.
+- `ConfigLoader.watch()`'s inline `() -> load()` lambda extracted to a named,
+  package-private `reload()` method purely as a test seam, so a test can
+  invoke the exact callback `watch()` wires up without waiting on a real
+  filesystem event.
+- `ConfigLoader.isWatching()` added as a package-private test seam to observe
+  `watch()`'s idempotency (second call is a no-op guard, not a
+  replace/duplicate) without depending on filesystem-event timing.
+- `FileWatcher`'s constructor widened to package-private, and `stop()`/
+  `isRunning()` added — closing a **real pre-existing functional gap**
+  (previously no way to stop a started watcher; config-reload watching ran
+  forever with no shutdown path), not just a test seam.
+
+**Real bug fixed while testing:** `HudConfig.updateThickness()` had a dead
+`try`/`catch` wrapped around a plain float division (`thickness / 2`), which
+can never throw in Java (unlike int division-by-zero, unlike the adjacent
+`updateColor()`'s `new Color(...)` constructor which genuinely can throw on
+out-of-range components). Removed as genuinely unreachable defensive code;
+documented inline in `HudConfig.java`.
+
+**Second real bug fixed while testing (cross-subproject coverage gap,
+`FileWatcher.run()`):** the end-of-work `chiseledBuild` regression sweep
+(Priority 3c) caught `:1.20.1-forge:jacocoTestCoverageVerification` failing at
+99% even though the *identical* `FileWatcher.java` source showed 100% on
+`1.20.1-fabric` — a real, deterministic (confirmed 3x each way, ruling out
+timing flakiness), subproject-dependent gap. Root cause, confirmed via
+`javap -c -l -p` decompilation of the compiled class: for a try-with-resources
+block whose resource's `close()` declares a checked exception, `javac`
+generates **two physically distinct bytecode blocks that close the resource**
+— one reachable only via a genuinely-normal (no-exception) fall-through exit
+of the try block, the other folded into the exception-handling/rethrow path.
+`run()`'s loop (`while (poll) { poll = pollEvents(watchService); }`) could in
+theory exit normally if `WatchKey.reset()` ever returned false, so javac
+generated both blocks — but no test exercises that path, since every real
+termination goes through `stop()`/`Thread.interrupt()` (the exception path).
+Two alternative fixes were considered and rejected: wrapping
+`watchService.close()` in its own `try`/`catch(IOException)` (rejected —
+confirmed via a throwaway scratch program that `WatchService.close()` never
+throws on double-close, so this would just create a different, permanently
+unreachable-without-reflection branch); forcing a real `WatchKey` invalidation
+by deleting the watched directory mid-test (rejected — not reliably
+reproducible within a short test window, too OS-timing-fragile for a hard
+gate). Fixed instead by making the loop unconditional
+(`while (true) { pollEvents(watchService); }`, discarding `reset()`'s return
+value), removing the try block's only normal-exit route so the ambiguous
+dual-path close bytecode collapses onto the one path that actually gets
+tested. This is a deliberate, honestly-documented minor behavior
+simplification: the watcher no longer proactively self-terminates if the
+watched directory is deleted out from under it (rare in practice), relying
+solely on the already-tested `stop()`/interrupt mechanism, which still works
+correctly since an invalidated key still leaves `WatchService.take()` blocking
+and still responsive to interrupts. Documented inline in `FileWatcher.java`.
+Re-verified 3x on `1.20.1-forge` and once on `1.20.1-fabric` after the fix,
+then a full `chiseledBuild` re-run confirmed all 10 cells still green.
+**Portable gotcha for sibling repos:** any try-with-resources wrapping a
+background-thread watcher/poller whose only real termination path is via an
+exception (interrupt) can hit this same subproject-dependent JaCoCo gap if it
+has a theoretical (but untested) normal-exit route out of the try block —
+worth checking in any other repo's coverage work that has a similar
+watcher-thread pattern.
+
+Final verification: `./gradlew ":1.20.1-fabric:check"` — `BUILD SUCCESSFUL`,
+`jacocoTestCoverageVerification` passing at the 100% bar; full
+`./gradlew chiseledBuild` — `BUILD SUCCESSFUL` across all 10 cells.
+
 ## Notes log (append as work proceeds; keep dated)
 
 - 2026-08-10: Repo analysis complete, upstream confirmed stale, newest stable
@@ -481,3 +615,26 @@ produces regardless of whether Forgix succeeds).
   produced jar confirms no regression and no green-but-empty jars. Committed
   as `925ecea` and pushed. Remaining open item: Forgix per-version wiring
   (Phase 4) — deferred, not part of this pass's brief.
+- 2026-08-10: Phase 2 follow-up brief (test coverage + Folia). Wired JUnit 5 +
+  JaCoCo into `build.gradle.kts` mirroring `critical-orientation`/
+  `critical-flight-details`'s canonical pattern. Drove line coverage from an
+  initial 97% (first full run) to enforced 100% across three iterations, each
+  diagnosed by parsing `jacocoTestReport.xml` directly rather than guessing —
+  see Phase 5 section above for the full class-by-class breakdown, exclusion
+  rationale, refactors, and the one real dead-code bug found
+  (`HudConfig.updateThickness()`'s unreachable catch block). Folia verdict:
+  n/a, client mod, one line per the repo-specific brief override — no further
+  investigation. `./gradlew ":1.20.1-fabric:check"` green at the 100% bar.
+  During the end-of-work `chiseledBuild` regression sweep, caught a second,
+  genuinely subtle real bug: `:1.20.1-forge:jacocoTestCoverageVerification`
+  failed at 99% on the *identical* `FileWatcher.java` source that showed 100%
+  on `1.20.1-fabric` — root-caused via `javap` bytecode decompilation to a
+  javac try-with-resources quirk (two distinct close-bytecode paths generated
+  when the try block has a theoretical, but untested, normal-exit route; only
+  the exception-path close ever gets exercised). Fixed by making `run()`'s
+  loop unconditional, removing the untested normal-exit route entirely rather
+  than chasing coverage of a fragile, hard-to-trigger-safely branch — full
+  detail, rejected alternatives, and the portable gotcha for sibling repos'
+  watcher-thread patterns are in the Phase 5 section above. Re-verified 3x per
+  subproject after the fix; full `chiseledBuild` regression sweep re-confirmed
+  all 10 cells still green afterward.
