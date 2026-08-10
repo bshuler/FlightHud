@@ -157,21 +157,50 @@ produces regardless of whether Forgix succeeds).
 - [x] Determine newest stable MC version live from Fabric meta API
 - [x] Write `CLAUDE.md`
 - [x] Write `PLAN.md` (this file)
-- [ ] Commit docs
-- [ ] Rename `master` → `main`, push, set default branch
+- [x] Commit docs
+- [x] Rename `master` → `main`, push, set default branch (confirmed current
+      branch and GitHub default branch are both `main`)
 
 ### Phase 1 — Stonecutter scaffold
-- [ ] `settings.gradle.kts`: `dev.kikugie.stonecutter` (latest: `0.9.7`) +
-      `gg.meza.stonecraft` (latest: `1.12.6`), declare all matrix nodes
-- [ ] `stonecutter.gradle.kts`: active node
-- [ ] Root `build.gradle.kts` (centralScript)
-- [ ] `gradle.properties`: mod metadata only
-- [ ] Move `src/main` → shared Stonecutter tree; confirm single-tree (no
-      per-version source forks) matches template
-- [ ] Gradle wrapper bump (template uses 8.11.1; newest node may need newer —
-      confirm against real build output)
-- [ ] Baseline sanity: `./gradlew :1.20.1-fabric:build` green with **zero**
-      source changes beyond what Stonecutter scaffolding requires
+- [x] `settings.gradle.kts`: `dev.kikugie.stonecutter` (pinned `0.9.+`,
+      resolved `0.9.7`) + `gg.meza.stonecraft` (pinned `1.10.+`), declares all
+      ten matrix nodes
+- [x] `stonecutter.gradle.kts`: active node (`1.20.1-fabric`, the pre-existing
+      baseline version)
+- [x] Root `build.gradle.kts` (centralScript)
+- [x] `gradle.properties`: mod metadata only (MC/loader/API versions live in
+      `versions/dependencies/*.properties` instead, per Stonecraft convention)
+- [x] `src/main` shared Stonecutter tree — already satisfied by construction:
+      the pre-existing single-version `src/main` tree sits at the repo root,
+      which IS what Stonecutter's shared-tree model expects for whichever
+      node is currently `active`; no file move was needed. No `//? if`
+      preprocessor directives exist yet (that's Phase 2/3 porting work, not
+      scaffolding).
+- [x] Gradle wrapper bump: 8.11.1 template default → `9.3.1` (matches what
+      `gg.meza.stonecraft 1.10.+` / Loom actually require; confirmed via real
+      build output, not assumption)
+- [x] Baseline sanity: `./gradlew :1.20.1-fabric:build` green with **zero**
+      source changes beyond Stonecutter scaffolding — confirmed twice (once
+      pre-existing-code-only, once after the `fabric.mod.json` per-node
+      dependency-string fix below, still green both times)
+
+### Phase 1.5 — Pre-existing defect fix (found during scaffolding, not new porting)
+- [x] `fabric.mod.json`'s `depends.minecraft` was hardcoded to `~1.19.4` even
+      though the codebase actually targets 1.20.1 — a stale leftover from a
+      prior manual port, and would have been silently wrong for every one of
+      the ten new nodes (each reporting the same static "~1.19.4" regardless
+      of which MC version it actually built against, breaking Fabric's own
+      dependency-compatibility check at game-load time even though the build
+      itself stays green). Fixed by templating it as `${minecraft_dependency}`
+      and wiring a `processResources.filesMatching("fabric.mod.json").expand(...)`
+      block in `build.gradle.kts` keyed off `stonecutter.current.version`,
+      mirroring the pre-Stonecutter Groovy build's existing `${version}`
+      expand pattern (which had to be carried forward explicitly too — losing
+      it broke the build with "Missing property (version) for Groovy template
+      expansion" on the first attempt, since Gradle's `expand()` replaces the
+      whole property map per `filesMatching` block rather than merging across
+      calls). Verified by inspecting the built jar's `fabric.mod.json`:
+      `"minecraft": "~1.20.1"`, `"version": "1.0.0+mc1.20.1"` — both correct.
 
 ### Phase 2 — Port latest-first (Fabric only first, loaders after)
 - [ ] 1.21.4-fabric: DrawContext/RenderLayer delta from 1.20.1 (real compiler
@@ -199,7 +228,10 @@ produces regardless of whether Forgix succeeds).
       subproject names)
 - [ ] Verify each merged jar actually loads under both of its constituent
       loaders (not just that `mergeJars` succeeds)
-- [ ] README/CLAUDE.md note confirming Quilt compatibility via Fabric jars
+- [x] README/CLAUDE.md note confirming Quilt compatibility via Fabric jars
+      (CLAUDE.md done in the requirement-update commit; README.md's
+      "Requirements"/"Supported versions and loaders" sections added this
+      pass, replacing the stale "Minecraft 1.16.1" requirements text)
 - [ ] PLAN.md status table fully updated
 - [ ] Final commit(s) pushed to `origin/main`
 
@@ -233,3 +265,15 @@ produces regardless of whether Forgix succeeds).
   the mandated loader-viability rule (Fabric+NeoForge for 1.20.5+, Fabric+Forge
   for ≤1.20.4) with no change needed to the matrix itself — added explicit
   "structural blocker" language per-cell instead of bare "n/a".
+- 2026-08-10: Committed the Stonecutter/Stonecraft scaffold (`d18bd0b`) after
+  the baseline `:1.20.1-fabric:build` sanity check went green. While closing
+  out Phase 0/1 checklist items, found and fixed a real pre-existing defect
+  surfaced by the scaffolding work: `fabric.mod.json`'s `depends.minecraft`
+  was hardcoded `~1.19.4` (stale relative to the actual 1.20.1 codebase), and
+  would have reported the same wrong, static string on every one of the ten
+  new nodes. Fixed via a per-node `processResources` expand keyed off
+  `stonecutter.current.version`; verified against the actual built jar
+  (`~1.20.1`, correct). Also updated README.md's stale "Minecraft 1.16.1"
+  requirements section with the real target matrix and a Quilt compatibility
+  note, and checked off completed Phase 0/1 boxes above. Next: Phase 2,
+  latest-first Fabric porting starting with 1.21.4-fabric.

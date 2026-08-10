@@ -26,6 +26,26 @@ __Flight HUD__ is a client side Fabric Minecraft Mod that adds a flight style HU
 ![HUD Components](images/hud-diagram.png?raw=true "HUD Components")
 
 ## Requirements
-- Minecraft 1.16.1
-- Fabric Mod Loader
+- Fabric Mod Loader (or **Quilt** — Quilt loads standard Fabric mod jars
+  natively, so any `*-fabric` build of this mod works unmodified under Quilt
+  with no separate build)
 - Fabric API Mod
+- One of the Minecraft versions in the build matrix below
+
+## Supported versions and loaders
+
+This mod is built with [Stonecutter](https://stonecutter.kikugie.dev/) +
+[Stonecraft](https://stonecraft.meza.gg/) across the following targets. Every
+cell is a real build target, not aspirational — see `PLAN.md` for live status
+and `CLAUDE.md` for architecture/porting notes.
+
+| MC version | Fabric | NeoForge | Forge |
+|---|---|---|---|
+| newest stable | target | target | n/a — not targeted for the newest two versions (program scope) |
+| 1.21.4 | target | target | n/a — not targeted for the newest two versions (program scope) |
+| 1.20.1 | target | n/a — NeoForge doesn't exist before 1.20.2 | target |
+| 1.19.4 | target | n/a — NeoForge doesn't exist before 1.20.2 | target |
+| 1.18.2 | target | n/a — NeoForge doesn't exist before 1.20.2 | target |
+
+Quilt users: install any `*-fabric` jar for your Minecraft version — no
+Quilt-specific build exists or is needed.
