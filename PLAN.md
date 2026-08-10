@@ -39,13 +39,17 @@ Reference config: `github.com/FabricMC/fabric-example-mod` default branch
 
 ## Target matrix
 
+**Status as of 2026-08-10: all 10 mandatory cells build green via
+`./gradlew chiseledBuild`, verified with real (non-empty) jar contents via
+`unzip -l` per cell — not just `BUILD SUCCESSFUL`.**
+
 | MC version | Fabric | NeoForge | Forge | Forgix merged jar |
 |---|---|---|---|---|
-| 26.2 (newest stable) | ❌ | ☐ | n/a — program scope (see below) | ☐ |
-| 1.21.4 | 🔧 | ☐ | n/a — program scope (see below) | ☐ |
-| 1.20.1 | 🔧 | n/a — structural, no NeoForge pre-1.20.2 | ☐ | ☐ |
-| 1.19.4 | ☐ | n/a — structural, no NeoForge pre-1.20.2 | ☐ | ☐ |
-| 1.18.2 | ☐ | n/a — structural, no NeoForge pre-1.20.2 | ☐ | ☐ |
+| 26.2 (newest stable) | ✅ | ✅ | n/a — program scope (see below) | ☐ |
+| 1.21.4 | ✅ | ✅ | n/a — program scope (see below) | ☐ |
+| 1.20.1 | ✅ | n/a — structural, no NeoForge pre-1.20.2 | ✅ | ☐ |
+| 1.19.4 | ✅ | n/a — structural, no NeoForge pre-1.20.2 | ✅ | ☐ |
+| 1.18.2 | ✅ | n/a — structural, no NeoForge pre-1.20.2 | ✅ | ☐ |
 
 Quilt: no separate column — every `*-fabric` jar is Quilt-compatible as-is
 (Quilt loads Fabric mod jars natively). Documented, not built separately.
@@ -229,40 +233,122 @@ produces regardless of whether Forgix succeeds).
       (previously green under the old Yarn-mapped tree pre-dating this
       session's port). Confirms the shared-tree `//? if` branching in
       `InGameHudMixin.java` resolves correctly for both eras.
-- [ ] 26.2-fabric: **attempted, blocked on a real architecture change, not a
-      simple rename.** Confirmed via `javap` against the actual 26.2 merged
-      jar: `GuiGraphics` **does not exist at all** in 26.2 — `Gui` no longer
-      has a `render(...)` method a mixin can inject into with a graphics
-      context. Instead `Gui` has
+- [x] 26.2-fabric: **unblocked, resolved.** The blocker recorded below (`Gui`
+      losing `render(...)` entirely, replaced by
       `extractRenderState(DeltaTracker, boolean, boolean)` writing into a
-      `net.minecraft.client.renderer.state.gui.GuiRenderState` object — a
-      render-state-extraction model (state is captured on this thread, then
-      consumed by a separate render pass), not the "just inject and draw"
-      model every earlier version uses. This is the real "post-1.21.6 render
-      pipeline rewrite" flagged in earlier drafts of CLAUDE.md, but the actual
-      shape of it (state-extraction object, not just a new draw API) wasn't
-      known until this `javap` pass. Needs dedicated research before porting:
-      how to append custom draw state to `GuiRenderState`/`GuiTextRenderState`
-      (or find the current equivalent mixin injection point), not yet done.
-      Also newly confirmed blocked on: `KeyMapping`'s 3-arg constructor now
-      takes a `KeyMapping.Category` (not a raw `String`) as its 3rd arg;
-      `KeyBindingHelper` and `ClientCommandManager` (Fabric API) were not
-      found under their 1.21.4 packages either — Fabric API's client-command
-      and keybinding-helper surface has moved/renamed by 26.2 and needs its
-      own `javap`/artifact-browsing pass against the 26.2 Fabric API jars.
-- [ ] 1.19.4-fabric: pre-DrawContext (`MatrixStack`-only) signatures
-- [ ] 1.18.2-fabric: same era as 1.19.4, confirm no additional delta
+      `GuiRenderState`) turned out not to require reverse-engineering
+      `GuiRenderState`/`GuiTextRenderState` internals at all — instead, every
+      loader already exposes its own official HUD-render hook that fires
+      *before* that extraction step, so the fix was architectural, not a
+      deeper mixin: replaced `mixin/InGameHudMixin.java` entirely with
+      `HudHooks`, a loader/version-conditional registration class hooking
+      `HudElementRegistry` (fabric≥26.1), `HudRenderCallback` (fabric else),
+      `RenderGuiEvent.Post` (neoforge), `OverlayRegistry`/
+      `RegisterGuiOverlaysEvent` (forge) directly — no Mixin needed anywhere
+      any more. All 9 rendering-logic files were re-pointed at a new
+      `FlightCanvas` interface; `PlatformCanvas` is the single Stonecutter-
+      branched adapter behind it (pre-1.20 `PoseStack`, 26.1+
+      `GuiGraphicsExtractor`/`Matrix3x2fStack`, else classic `GuiGraphics`).
+      Two real bugs found and fixed via `javap` against the real 26.2 jar
+      along the way: `Identifier.of(String,String)` doesn't exist on 26.2 (no
+      2-arg `of` overload at all — use `Identifier.fromNamespaceAndPath`
+      instead), and `HudElementRegistry.addLast` needs a `DeltaTracker`
+      import scoped to the branches that actually use it (it doesn't exist
+      pre-1.21.2, broke 1.20.1-fabric when left unconditional). The
+      `KeyMapping.Category`/`ResourceLocation`→`Identifier` boundary and the
+      `ClientCommandManager`→`ClientCommands` Fabric-API rename (both
+      correctly anticipated in the pre-existing tree) needed no further
+      changes. `:26.2-fabric:build` green, jar contents verified non-empty.
+- [x] 1.19.4-fabric: green. Real delta from 1.20.1, confirmed via `javap`:
+      `GuiGraphics` doesn't exist pre-1.20 (`PlatformCanvas`'s `<1.20` branch
+      uses raw `PoseStack` + `GuiComponent.fill(PoseStack,...)` +
+      `Font.draw(PoseStack,...)` instead); otherwise unchanged from 1.20.1 at
+      this version (fill/drawText signatures are identical between 1.19.4 and
+      1.18.2 too — confirmed via `javap` on both jars, no fix needed there).
+- [x] 1.18.2-fabric: green. Three more genuine, version-specific deltas below
+      1.19.4 that were NOT shared with it (all confirmed via `javap` against
+      the real 1.18.2 jar and cross-checked against the 1.19.4 jar to find
+      the exact boundary, not assumed):
+      - `Options.fov()` doesn't exist as a method in 1.18.2 — it's a plain
+        `double fov` field; the `OptionInstance<Integer>`-returning method
+        form starts at 1.19.4. Split in `Dimensions.java` via `//? if <1.19`.
+      - `com.mojang.math.Axis` doesn't exist in 1.18.2 at all (introduced at
+        1.19.4). 1.18.2's `PoseStack.mulPose` takes the older
+        `com.mojang.math.Quaternion` (via `Vector3f.ZP.rotationDegrees(...)`),
+        not the JOML `Quaternionf` that `Axis.ZP.rotationDegrees(...)`
+        returns and that 1.19.4+'s `mulPose` overload expects — genuinely a
+        `<1.19`/else split, not folded into the existing `<1.20` branch,
+        since `Vector3f` is fully removed (not just deprecated) by 1.19.4.
+        Fixed in `PlatformCanvas.rotateDegrees()`.
+      - The Fabric Client Command API v2 package
+        (`net.fabricmc.fabric.api.client.command.v2`) is not published at all
+        for 1.18.2's Fabric API bundle (confirmed: no
+        `fabric-command-api-v2-*` artifact resolves for 1.18.2 in the
+        loom-cache, unlike every other node in the matrix). Rather than fork
+        a second command-API generation for one version, gated the
+        `/flighthud toggle` command's imports, `FlightHud.setupCommand()`
+        (and its call site), and `SwitchDisplayModeCommand.java`'s whole body
+        to `fabric && >=1.19` — 1.18.2-fabric simply doesn't get the chat
+        command (the keybind, unaffected by any of this, still covers it on
+        every loader per the existing Fabric-only-command scope decision).
+      Also found and fixed a **pre-existing latent bug** while diagnosing
+      this: `SwitchDisplayModeCommand.java` had no Stonecutter guard at all
+      originally despite depending on the Fabric-only
+      `FabricClientCommandSource` type — it happened to never get caught
+      because no non-fabric node had reached that file yet. Now correctly
+      guarded.
 
 ### Phase 3 — Loaders
-- [ ] 1.21.4-neoforge
-- [ ] 26.2-neoforge
-- [ ] 1.20.1-forge
-- [ ] 1.19.4-forge
-- [ ] 1.18.2-forge
+- [x] 1.21.4-neoforge: green. `RenderGuiEvent.Post#getGuiGraphics()` returns
+      `GuiGraphics` here (vs. `GuiGraphicsExtractor` on 26.2-neoforge) —
+      confirmed via `javap` that NeoForge itself already adapted this one
+      event across the 26.x architecture change, so `HudHooks`'s neoforge
+      branch is identical source for both NeoForge cells with zero extra
+      branching (the `new PlatformCanvas(event.getGuiGraphics())` call site
+      resolves against whichever `PlatformCanvas` constructor overload that
+      node compiled).
+- [x] 26.2-neoforge: green, same finding as above. Also needed
+      `neoforge.mods.toml` (previously entirely missing from this repo) added
+      alongside the pre-existing `mods.toml`, wired through the same
+      `variableReplacements` metadata-expansion pattern as `fabric.mod.json`.
+- [x] 1.20.1-forge: green. Confirmed `HudHooks.register()`'s
+      `OverlayRegistry`-based imperative path (forge&&<1.19) does not apply
+      here — 1.20.1 uses the event-based `RegisterGuiOverlaysEvent`/
+      `registerOverlays(...)` path registered on the mod event bus at
+      construction, matching the `else`/`forge` branch that also covers
+      1.19.4-forge. Forge's `pack.mcmeta` task-graph ordering issue (noted as
+      a standing risk in earlier sessions) did not recur — confirmed
+      `generatePackMCMetaJson` runs cleanly.
+- [x] 1.19.4-forge: green. Uses the same event-based `registerOverlays(...)`
+      path as 1.20.1-forge (both are `forge && >=1.19`); the
+      `RegisterKeyMappingsEvent`/`ClientRegistry.registerKeyBinding` boundary
+      at 1.19 (already anticipated in the pre-existing tree) needed no
+      further change.
+- [x] 1.18.2-forge: green, the last cell in the matrix. Found and fixed one
+      more latent bug while porting this one: `HudHooks.registerOverlays()`
+      was guarded `forge && <1.20`, which wrongly included forge<1.19
+      (1.18.2) — 1.18.2-forge doesn't use `RegisterGuiOverlaysEvent`/
+      `ForgeGui` at all (neither type resolves against the 1.18.2 Forge jar);
+      it registers imperatively via `OverlayRegistry.registerOverlayTop(...)`
+      in `register()` instead, matching Forge's `<1.19` era exactly like
+      NeoForge doesn't exist for it. Re-guarded to
+      `forge && <1.19 { /* empty */ } elif forge && <1.20 { ... } elif forge { ... }`
+      so the method simply doesn't exist for 1.18.2-forge. This would have
+      broken the build the moment 1.18.2-forge tried to compile it — caught
+      before it did, not after a failed build.
 
 ### Phase 4 — Verification
-- [ ] `./gradlew chiseledBuild` green for every matrix cell (or documented
-      exception with real error evidence)
+- [x] `./gradlew chiseledBuild` green for every matrix cell — run as a final
+      sweep after all 10 cells were individually confirmed, specifically to
+      catch any regression from the shared-file edits (`HudHooks.java`,
+      `FlightHud.java`, `PlatformCanvas.java`, `Dimensions.java`,
+      `SwitchDisplayModeCommand.java` are all touched by multiple cells).
+      **Also verified jar contents, not just `BUILD SUCCESSFUL`**: `unzip -l`
+      on all 10 built jars confirms real, non-empty `net/torocraft/flighthud`
+      class trees (24 classes for non-fabric/1.18.2-fabric nodes, 25 for
+      fabric≥1.19 nodes — the +1 is `SwitchDisplayModeCommand.class`, present
+      exactly where expected and absent exactly where it should be per the
+      1.18.2 command-API scope reduction above). No green-but-empty jars.
 - [ ] Wire Forgix (`io.github.pacifistmc.forgix` `2.0.0`) at the physical root
       build script; one `forgix { }` block per MC version with explicit
       `inputJar` overrides pointing at that version's `<mc>-fabric` /
@@ -275,8 +361,8 @@ produces regardless of whether Forgix succeeds).
       (CLAUDE.md done in the requirement-update commit; README.md's
       "Requirements"/"Supported versions and loaders" sections added this
       pass, replacing the stale "Minecraft 1.16.1" requirements text)
-- [ ] PLAN.md status table fully updated
-- [ ] Final commit(s) pushed to `origin/main`
+- [x] PLAN.md status table fully updated (this pass)
+- [x] Final commit(s) pushed to `origin/main` (`cb35342`, `e6a07c0`, `925ecea`)
 
 ## Notes log (append as work proceeds; keep dated)
 
@@ -358,3 +444,40 @@ produces regardless of whether Forgix succeeds).
   architecture change (`GuiGraphics` removed entirely, replaced by a
   render-state-extraction model) — see Phase 2 checklist above for the full
   `javap`-confirmed finding. Not yet resolved; needs its own research pass.
+- 2026-08-10: Ran the deferred 26.2 research pass and it resolved cleanly: the
+  `GuiRenderState`/`extractRenderState(...)` model only affects the *engine's*
+  internal render pass — every loader still fires its own official HUD-render
+  hook before that extraction happens, so the fix was to stop mixin-injecting
+  into `Gui.render(...)` (which no longer exists on 26.x) and instead hook
+  each loader's own event/registry directly. Replaced
+  `mixin/InGameHudMixin.java` with `HudHooks` + a new `FlightCanvas` interface
+  (`PlatformCanvas` is the one Stonecutter-branched adapter behind it: pre-1.20
+  `PoseStack`, 26.1+ `GuiGraphicsExtractor`, else classic `GuiGraphics`).
+  Rewrote `FlightHud.java`'s entrypoint to be loader-conditional (Fabric
+  `ClientModInitializer` vs. NeoForge/Forge `@Mod`), fixed `ConfigFolder`
+  (was Fabric-only, would have broken every NeoForge/Forge compile), and
+  added the previously-missing `mods.toml`/`neoforge.mods.toml`. Result:
+  **26.2-fabric and 26.2-neoforge both green** — 26.2 is not blocked.
+  Committed as `cb35342`.
+- 2026-08-10: Continued straight through the rest of the matrix in
+  version-descending, loader-by-loader order, applying the same
+  `HudHooks`/`FlightCanvas` architecture: fixed a scoped-import bug in
+  `HudHooks.java` (`DeltaTracker` was unconditionally imported despite not
+  existing before 1.21.2, breaking 1.20.1-fabric — committed as `e6a07c0`
+  alongside re-verified 1.20.1-fabric and new 1.20.1-forge), then
+  1.21.4-fabric/neoforge, 1.19.4-fabric/forge, and finally 1.18.2-fabric/forge
+  — the last two needing three genuine, previously-undocumented 1.18.2-only
+  API deltas (`Options.fov()` field-vs-method, `Axis`-vs-`Vector3f`,
+  fabric-command-api-v2 absence) plus one latent pre-existing bug found along
+  the way (`HudHooks.registerOverlays()`'s guard wrongly included forge<1.19).
+  See the Phase 2/3 checklist entries above for the full detail on each; every
+  finding was confirmed via `javap` against the real per-node merged jar, not
+  assumed. Also picked up a Stonecutter mechanics lesson worth recording:
+  **"Set active project to X" and "the next build" must be two separate
+  `./gradlew` invocations**, never combined in one command — combining them
+  once produced a spurious `stonecutterGenerate`-implicitly-depends-on-
+  `stonecutterMerge` task-validation failure. All 10 target cells now build
+  green; a final `./gradlew chiseledBuild` sweep plus `unzip -l` on every
+  produced jar confirms no regression and no green-but-empty jars. Committed
+  as `925ecea` and pushed. Remaining open item: Forgix per-version wiring
+  (Phase 4) — deferred, not part of this pass's brief.
