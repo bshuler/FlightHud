@@ -59,24 +59,44 @@ net.torocraft.flighthud/
 
 ### Cross-version hotspots (in descending order of risk)
 
-1. **`HudComponent.fill()`** — hand-rolled immediate-mode quad via
-   `Tessellator.getInstance().getBuffer()` / `BufferBuilder` / `RenderSystem` /
-   `BufferRenderer.drawWithGlobalProgram` / `GameRenderer::getPositionColorProgram`.
-   This immediate-mode API was **replaced by a new `RenderPipeline`-based renderer**
-   starting around MC 1.21.6, and Minecraft 26.1 additionally became fully
-   **unobfuscated** with an optional Vulkan backend (26.2 "Chaos Cubed"). Expect this
-   method (and only this method) to need a real per-era rewrite, not just an
-   import swap.
-2. **`DrawContext` existence** — `DrawContext` (and `context.getMatrices()`,
-   `context.drawText(...)`) was introduced in MC 1.20. MC 1.18.2 and 1.19.4 predate
-   it: `HudComponent.render(...)`, every component's `render(...)`, `HudRenderer`,
-   and `InGameHudMixin` all take a `MatrixStack` directly instead of a `DrawContext`,
-   and text is drawn via `client.textRenderer.draw(matrices, ...)` /
-   `DrawableHelper`, not `context.drawText(...)`.
-3. **`InGameHudMixin` injection signature** — must match whatever `InGameHud.render`
-   looks like per version (`render(MatrixStack, float)` pre-1.20, `render(DrawContext,
-   float)` 1.20+, possible further signature drift in 1.21.6+/26.x pending actual
-   compile evidence).
+1. **`Gui` render architecture past MC ~1.21.6/26.x** — confirmed via `javap`
+   against the real 26.2 merged jar (not assumption): `GuiGraphics` **does not
+   exist at all** in 26.2, and `Gui` no longer has any `render(...)` method to
+   mixin-inject into with a graphics context. It instead has
+   `extractRenderState(DeltaTracker, boolean, boolean)`, which populates a
+   `net.minecraft.client.renderer.state.gui.GuiRenderState` object consumed by
+   a separate render pass later — a genuine state-extraction architecture
+   change, not just an API rename. **Not yet ported** — needs a dedicated
+   research pass to find the correct injection point and how to contribute
+   custom draw state to `GuiRenderState`/`GuiTextRenderState` (or whatever the
+   current equivalent is) before 26.2-fabric can compile. See PLAN.md Phase 2
+   for the full finding.
+2. **`HudComponent.fill()`** — on 1.21.4 this is a solved, simple case: it now
+   calls the built-in pose-aware `GuiGraphics.fill(int,int,int,int,int)`
+   directly (confirmed present via `javap`), replacing the old hand-rolled
+   immediate-mode quad via `Tessellator.getInstance().getBuffer()` /
+   `BufferBuilder` / `RenderSystem` / `BufferRenderer.drawWithGlobalProgram` /
+   `GameRenderer::getPositionColorProgram` that 1.20.1 still uses. The real
+   risk has moved downstream to 26.x (see hotspot #1 above) — once
+   `GuiGraphics` itself is gone, `fill()` will need a second rewrite against
+   whatever `GuiRenderState`-based primitive replaces it.
+3. **`DrawContext`/`GuiGraphics` existence** — `DrawContext` (renamed
+   `GuiGraphics` in Mojmap) was introduced in MC 1.20. MC 1.18.2 and 1.19.4
+   predate it: `HudComponent.render(...)`, every component's `render(...)`,
+   `HudRenderer`, and `InGameHudMixin` all need to take a `PoseStack`/
+   `MatrixStack` directly instead, and text is drawn via
+   `client.font.draw(matrices, ...)`, not `context.drawText(...)`. **Not yet
+   ported** — the current shared tree only has the `GuiGraphics`-based shape;
+   1.19.4/1.18.2 need their own Stonecutter conditional branch for every
+   render-signature call site, mirroring the `>=1.21.2` DeltaTracker branch
+   already written in `InGameHudMixin.java` (see hotspot #4).
+4. **`InGameHudMixin` injection signature** — must match whatever `Gui.render`
+   (Mojmap; was `InGameHud.render`) looks like per version. Confirmed via
+   `javap`: 1.20.1 is `render(GuiGraphics, float)`; 1.21.4 added a second
+   parameter, `render(GuiGraphics, DeltaTracker, CallbackInfo)` — handled with
+   one `//? if >=1.21.2 { ... } else { ... }` block, already written. 26.x
+   removes this method entirely (see hotspot #1). Pre-1.20 versions will need
+   a third branch once ported (hotspot #3).
 4. **Fabric-only APIs used directly, not yet abstracted per-loader**:
    - `SwitchDisplayModeCommand implements Command<FabricClientCommandSource>` —
      Forge/NeoForge have a differently-typed client command source. Descoped:
@@ -129,6 +149,16 @@ and `settings.gradle.kts` together aren't enough context.
   declares every `(version, loader)` node via `stonecutter { mc(version, loaders...) }`.
 - `stonecutter.gradle.kts` — records the currently "active" version/loader node
   (what IDE tooling and `runClient` target); auto-managed, marked `DO NOT EDIT`.
+  **Never hand-edit this file.** To switch it, run the Gradle task Stonecutter
+  registers per node — its display name (not obviously "stonecutter"-prefixed,
+  so case-insensitive grepping for that word misses it in `tasks --all`
+  output) is `"Set active project to <mc>-<loader>"`, e.g.
+  `./gradlew "Set active project to 1.21.4-fabric"`. This matters because a
+  node's `:<node>:build` only compiles correctly when it — or the currently
+  `active` node — actually matches the shared tree's current `//? if`
+  toggle-state; switching active runs the real generate/prepare step that
+  keeps them in sync, which a plain `:<node>:build` does not trigger on its
+  own if the active marker is stale.
 - `build.gradle.kts` (root, `centralScript`) — shared build logic applied to every
   node via the `gg.meza.stonecraft` plugin; per-version/per-loader dependency
   coordinates (Minecraft, mappings or lack thereof, loader, Fabric API / NeoForge /
@@ -179,21 +209,51 @@ each version's per-loader jars into one combined jar.
 
 ## Porting notes by MC version (fill in / correct as work proceeds)
 
-- **1.20.1 (baseline)**: current upstream state. `DrawContext` + old immediate-mode
-  `fill()` as described above.
-- **1.21.4**: DrawContext-based GUI rendering continues but with API churn
-  (`RenderLayer`/vertex-consumer signature changes) between 1.20.1 and 1.21.x.
-  Verify exact deltas against real compiler errors, not assumption.
-- **Newest stable (26.x)**: Minecraft moved to year-based versioning (`YY.N`)
-  starting in 2026. **26.1 was the first fully unobfuscated release** — no more
-  Yarn/Intermediary mappings exist or are needed (Fabric stopped publishing Yarn
-  after 1.21.11). Loom config for this era has **no `mappings` block at all**;
-  see `https://github.com/FabricMC/fabric-example-mod` (default branch tracks the
-  newest MC version) for the current reference `build.gradle`/`gradle.properties`
-  shape. Also expect: Java 25 (via toolchain auto-provisioning, not a system JDK
-  install), and the immediate-mode rendering rewrite mentioned above.
-- **1.19.4 / 1.18.2**: predate `DrawContext` entirely; render methods take
-  `MatrixStack` directly, and `InGameHud`'s render mixin target differs accordingly.
+**Mapping scheme (decided this pass): uniform Mojmap across all 5 MC
+versions**, not a Yarn(legacy)/Mojmap(modern) split. Yarn mappings stop
+existing entirely past 1.21.11 (26.x is unobfuscated-only via Mojang's own
+mappings), so splitting the tree into two mapping vocabularies for what is
+otherwise one shared source tree would only add bookkeeping for no benefit.
+`versions/dependencies/{1.18.2,1.19.4,1.20.1}.properties` have `yarn_mappings`
+removed accordingly (each carries a comment explaining why).
+
+- **1.20.1 (baseline)**: ✅ builds green under the uniform-Mojmap tree.
+  `GuiGraphics` + `GuiGraphics.fill(int,int,int,int,int)` overload used
+  directly, `Gui.render(GuiGraphics, float, CallbackInfo)` mixin signature.
+- **1.21.4**: ✅ builds green. Real delta from 1.20.1, all confirmed via
+  `javap` against the real per-project jar (not assumption): `Gui.render`
+  gained a `DeltaTracker` parameter (`render(GuiGraphics, DeltaTracker,
+  CallbackInfo)`) in place of the trailing `float tickDelta`, handled with a
+  `//? if >=1.21.2 { ... } else { ... }` block in `InGameHudMixin.java`.
+  `Entity.hasVehicle()` doesn't exist in Mojmap at all — replaced with
+  `player.getVehicle() != null`. Full symbol-rename table (KeyMapping,
+  InputConstants, Options.fov(), Window.getGuiScaledWidth(), etc.) verified
+  and applied; see git history for the full diff.
+- **Newest stable (26.x)**: ❌ blocked, real architecture change, not API
+  churn. Minecraft moved to year-based versioning (`YY.N`) starting in 2026.
+  **26.1 was the first fully unobfuscated release** — no more Yarn/Intermediary
+  mappings exist or are needed. Loom config for this era has **no `mappings`
+  block at all**. Toolchain auto-provisioning (Java 25) requires the
+  `org.gradle.toolchains.foojay-resolver-convention` plugin in
+  `settings.gradle.kts` — added this pass (version `1.0.0`; `0.8.0` is
+  incompatible with this project's Gradle 9.3.1). The real blocker, confirmed
+  via `javap` against the actual 26.2 jar: **`GuiGraphics` does not exist**,
+  and `Gui` has no `render(...)` method at all — it's been replaced by
+  `extractRenderState(DeltaTracker, boolean, boolean)` writing into a
+  `net.minecraft.client.renderer.state.gui.GuiRenderState`, a genuine
+  render-state-extraction architecture, not a renamed draw API. Also newly
+  found blocked: `KeyMapping`'s 3-arg constructor now takes a
+  `KeyMapping.Category` instead of a raw `String`; Fabric API's
+  `KeyBindingHelper`/`ClientCommandManager` weren't found under their 1.21.4
+  packages either. None of this is ported yet — needs its own research pass
+  before resuming 26.2-fabric.
+- **1.19.4 / 1.18.2**: not yet started. Predate `DrawContext`/`GuiGraphics`
+  entirely; render methods take `PoseStack`/`MatrixStack` directly, and
+  `Gui`'s render mixin target differs accordingly (see "Cross-version
+  hotspots" #3/#4 above). The current shared tree only has the
+  `GuiGraphics`-shaped code live; this era needs its own Stonecutter
+  conditional branch added to every render call site, the same way the
+  `DeltaTracker` mixin branch was done for 1.21.4 vs 1.20.1.
 
 ## Environment notes
 

@@ -1,8 +1,8 @@
 package net.torocraft.flighthud;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.util.math.MatrixStack;
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import net.torocraft.flighthud.components.AltitudeIndicator;
 import net.torocraft.flighthud.components.ElytraHealthIndicator;
 import net.torocraft.flighthud.components.FlightPathIndicator;
@@ -25,7 +25,7 @@ public class HudRenderer extends HudComponent {
           new AltitudeIndicator(computer, dim), new PitchIndicator(computer, dim),
           new ElytraHealthIndicator(computer, dim)};
 
-  private void setupConfig(MinecraftClient client) {
+  private void setupConfig(Minecraft client) {
     HudComponent.CONFIG = null;
     if (client.player.isFallFlying()) {
       if (FlightHud.CONFIG_SETTINGS.displayModeWhenFlying.equals(FULL)) {
@@ -43,7 +43,7 @@ public class HudRenderer extends HudComponent {
   }
 
   @Override
-  public void render(DrawContext context, float tickDelta, MinecraftClient client) {
+  public void render(GuiGraphics context, float tickDelta, Minecraft client) {
     setupConfig(client);
 
     if (HudComponent.CONFIG == null) {
@@ -52,8 +52,8 @@ public class HudRenderer extends HudComponent {
 
     try {
 
-      MatrixStack m = context.getMatrices();
-      m.push();
+      PoseStack m = context.pose();
+      m.pushPose();
 
       if (HudComponent.CONFIG.scale != 1d) {
         float scale = 1 / (float) HudComponent.CONFIG.scale;
@@ -66,7 +66,7 @@ public class HudRenderer extends HudComponent {
       for (HudComponent component : components) {
         component.render(context, tickDelta, client);
       }
-      m.pop();
+      m.popPose();
     } catch (Exception e) {
       e.printStackTrace();
     }

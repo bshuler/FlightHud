@@ -1,16 +1,13 @@
 package net.torocraft.flighthud;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.render.*;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.math.RotationAxis;
-import org.joml.Matrix4f;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Axis;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import net.torocraft.flighthud.config.HudConfig;
 
 public abstract class HudComponent {
-  public abstract void render(DrawContext context, float tickDelta, MinecraftClient client);
+  public abstract void render(GuiGraphics context, float tickDelta, Minecraft client);
 
   public static HudConfig CONFIG;
 
@@ -18,13 +15,14 @@ public abstract class HudComponent {
     return (int) Math.round(d);
   }
 
-  protected void drawPointer(MatrixStack m, float x, float y, float rot) {
-    m.push();
-    m.translate(x, y, 0);
-    m.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(rot + 45));
-    drawVerticalLine(m, 0, 0, 5);
-    drawHorizontalLine(m, 0, 5, 0);
-    m.pop();
+  protected void drawPointer(GuiGraphics context, float x, float y, float rot) {
+    PoseStack pose = context.pose();
+    pose.pushPose();
+    pose.translate(x, y, 0);
+    pose.mulPose(Axis.ZP.rotationDegrees(rot + 45));
+    drawVerticalLine(context, 0, 0, 5);
+    drawHorizontalLine(context, 0, 5, 0);
+    pose.popPose();
   }
 
   protected float wrapHeading(float degrees) {
@@ -35,29 +33,29 @@ public abstract class HudComponent {
     return degrees;
   }
 
-  protected void drawFont(MinecraftClient mc, MatrixStack m, String s, float x, float y, DrawContext context) {
-    drawFont(mc, m, s, x, y, CONFIG.color, context);
+  protected void drawFont(Minecraft mc, GuiGraphics context, String s, float x, float y) {
+    drawFont(mc, context, s, x, y, CONFIG.color);
   }
 
-  protected void drawFont(MinecraftClient mc, MatrixStack m, String s, float x, float y,
-      int color, DrawContext context) {
-    context.drawText(mc.textRenderer, s, (int) x, (int) y, CONFIG.color, false);
+  protected void drawFont(Minecraft mc, GuiGraphics context, String s, float x, float y,
+      int color) {
+    context.drawString(mc.font, s, (int) x, (int) y, CONFIG.color, false);
   }
 
-  protected void drawRightAlignedFont(MinecraftClient mc, MatrixStack m, String s, float x,
-      float y, DrawContext context) {
-    int w = mc.textRenderer.getWidth(s);
-    drawFont(mc, m, s, x - w, y, context);
+  protected void drawRightAlignedFont(Minecraft mc, GuiGraphics context, String s, float x,
+      float y) {
+    int w = mc.font.width(s);
+    drawFont(mc, context, s, x - w, y);
   }
 
-  protected void drawBox(MatrixStack m, float x, float y, float w, float h) {
-    drawHorizontalLine(m, x, x + w, y);
-    drawHorizontalLine(m, x, x + w, y + h);
-    drawVerticalLine(m, x, y, y + h);
-    drawVerticalLine(m, x + w, y, y + h);
+  protected void drawBox(GuiGraphics context, float x, float y, float w, float h) {
+    drawHorizontalLine(context, x, x + w, y);
+    drawHorizontalLine(context, x, x + w, y + h);
+    drawVerticalLine(context, x, y, y + h);
+    drawVerticalLine(context, x + w, y, y + h);
   }
 
-  protected void drawHorizontalLineDashed(MatrixStack m, float x1, float x2, float y,
+  protected void drawHorizontalLineDashed(GuiGraphics context, float x1, float x2, float y,
       int dashCount) {
     float width = x2 - x1;
     int segmentCount = dashCount * 2 - 1;
@@ -73,64 +71,38 @@ public abstract class HudComponent {
       } else {
         dx2 = ((i + 1) * dashSize) + x1;
       }
-      drawHorizontalLine(m, dx1, dx2, y);
+      drawHorizontalLine(context, dx1, dx2, y);
     }
   }
 
-  protected void drawHorizontalLine(MatrixStack matrices, float x1, float x2, float y) {
+  protected void drawHorizontalLine(GuiGraphics context, float x1, float x2, float y) {
     if (x2 < x1) {
       float i = x1;
       x1 = x2;
       x2 = i;
     }
-    fill(matrices, x1 - CONFIG.halfThickness, y - CONFIG.halfThickness, x2 + CONFIG.halfThickness,
+    fill(context, x1 - CONFIG.halfThickness, y - CONFIG.halfThickness, x2 + CONFIG.halfThickness,
         y + CONFIG.halfThickness);
   }
 
-  protected void drawVerticalLine(MatrixStack matrices, float x, float y1, float y2) {
+  protected void drawVerticalLine(GuiGraphics context, float x, float y1, float y2) {
     if (y2 < y1) {
       float i = y1;
       y1 = y2;
       y2 = i;
     }
 
-    fill(matrices, x - CONFIG.halfThickness, y1 + CONFIG.halfThickness, x + CONFIG.halfThickness,
+    fill(context, x - CONFIG.halfThickness, y1 + CONFIG.halfThickness, x + CONFIG.halfThickness,
         y2 - CONFIG.halfThickness);
   }
 
-  public static void fill(MatrixStack matrices, float x1, float y1, float x2, float y2) {
-    fill(matrices.peek().getPositionMatrix(), x1, y1, x2, y2);
-  }
-
-  private static void fill(Matrix4f matrix, float x1, float y1, float x2, float y2) {
-    float j;
-
-    if (x1 < x2) {
-      j = x1;
-      x1 = x2;
-      x2 = j;
-    }
-
-    if (y1 < y2) {
-      j = y1;
-      y1 = y2;
-      y2 = j;
-    }
+  // GuiGraphics.fill() is a built-in, pose-aware colored-quad primitive that
+  // already applies context.pose()'s current transform -- no need to hand-roll
+  // the immediate-mode Tessellator/BufferBuilder/RenderSystem plumbing the
+  // pre-1.20 codebase used, since DrawContext/GuiGraphics didn't exist then.
+  protected void fill(GuiGraphics context, float x1, float y1, float x2, float y2) {
     int color = CONFIG.color;
-    float alpha = (float) (color >> 24 & 255) / 255.0F;
-    float r = (float) (color >> 16 & 255) / 255.0F;
-    float g = (float) (color >> 8 & 255) / 255.0F;
-    float b = (float) (color & 255) / 255.0F;
-    BufferBuilder bufferBuilder = Tessellator.getInstance().getBuffer();
-    RenderSystem.enableBlend();
-    RenderSystem.defaultBlendFunc();
-    RenderSystem.setShader(GameRenderer::getPositionColorProgram);
-    bufferBuilder.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
-    bufferBuilder.vertex(matrix, x1, y2, 0.0F).color(r, g, b, alpha).next();
-    bufferBuilder.vertex(matrix, x2, y2, 0.0F).color(r, g, b, alpha).next();
-    bufferBuilder.vertex(matrix, x2, y1, 0.0F).color(r, g, b, alpha).next();
-    bufferBuilder.vertex(matrix, x1, y1, 0.0F).color(r, g, b, alpha).next();
-    BufferRenderer.drawWithGlobalProgram(bufferBuilder.end());
-    RenderSystem.disableBlend();
+    context.fill(i(Math.min(x1, x2)), i(Math.min(y1, y2)), i(Math.max(x1, x2)),
+        i(Math.max(y1, y2)), color);
   }
 }

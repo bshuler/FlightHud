@@ -14,6 +14,9 @@ pluginManagement {
 plugins {
     id("gg.meza.stonecraft") version "1.10.+"
     id("dev.kikugie.stonecutter") version "0.9.+"
+    // Auto-provisions JDKs (e.g. Java 25 for MC 26.x) that aren't installed
+    // locally, so `./gradlew` doesn't need a system JDK per MC version.
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
 stonecutter {

@@ -1,8 +1,7 @@
 package net.torocraft.flighthud.components;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import net.torocraft.flighthud.Dimensions;
 import net.torocraft.flighthud.FlightComputer;
 import net.torocraft.flighthud.HudComponent;
@@ -17,7 +16,7 @@ public class AltitudeIndicator extends HudComponent {
   }
 
   @Override
-  public void render(DrawContext context, float partial, MinecraftClient mc) {
+  public void render(GuiGraphics context, float partial, Minecraft mc) {
     float top = dim.tFrame;
     float bottom = dim.bFrame;
 
@@ -30,23 +29,21 @@ public class AltitudeIndicator extends HudComponent {
     float yFloor = dim.yMid - floorOffset;
     float xAltText = right + 5;
 
-    MatrixStack m = context.getMatrices();
-
     if (CONFIG.altitude_showGroundInfo) {
-      drawHeightIndicator(mc, m, left - 1, dim.yMid, bottom - dim.yMid);
+      drawHeightIndicator(mc, context, left - 1, dim.yMid, bottom - dim.yMid);
     }
 
     if (CONFIG.altitude_showReadout) {
-      drawFont(mc, m, String.format("%.0f", computer.altitude), xAltText, dim.yMid - 3, context);
-      drawBox(m, xAltText - 2, dim.yMid - 4.5f, 28, 10);
+      drawFont(mc, context, String.format("%.0f", computer.altitude), xAltText, dim.yMid - 3);
+      drawBox(context, xAltText - 2, dim.yMid - 4.5f, 28, 10);
     }
 
     if (CONFIG.altitude_showHeight) {
-      drawFont(mc, m, "G", xAltText - 10, bottom + 3, context);
+      drawFont(mc, context, "G", xAltText - 10, bottom + 3);
       String heightText = computer.distanceFromGround == null ? "??"
           : String.format("%d", i(computer.distanceFromGround));
-      drawFont(mc, m, heightText, xAltText, bottom + 3, context);
-      drawBox(m, xAltText - 2, bottom + 1.5f, 28, 10);
+      drawFont(mc, context, heightText, xAltText, bottom + 3);
+      drawBox(context, xAltText - 2, bottom + 1.5f, 28, 10);
     }
 
     if (CONFIG.altitude_showScale) {
@@ -57,34 +54,34 @@ public class AltitudeIndicator extends HudComponent {
           continue;
 
         if (i % 50 == 0) {
-          drawHorizontalLine(m, left, right + 2, y);
+          drawHorizontalLine(context, left, right + 2, y);
           if (!CONFIG.altitude_showReadout || y > dim.yMid + 7 || y < dim.yMid - 7) {
-            drawFont(mc, m, String.format("%d", i), xAltText, y - 3, context);
+            drawFont(mc, context, String.format("%d", i), xAltText, y - 3);
           }
         }
-        drawHorizontalLine(m, left, right, y);
+        drawHorizontalLine(context, left, right, y);
       }
     }
   }
 
-  private void drawHeightIndicator(MinecraftClient client, MatrixStack m, float x, float top, float h) {
+  private void drawHeightIndicator(Minecraft client, GuiGraphics context, float x, float top, float h) {
     float bottom = top + h;
-    float blocksPerPixel =  h / (client.world.getHeight() + 64f);
+    float blocksPerPixel =  h / (client.level.getHeight() + 64f);
     float yAlt = bottom - i((computer.altitude + 64) * blocksPerPixel);
     float yFloor = bottom - i(64 * blocksPerPixel);
 
-    drawVerticalLine(m, x, top - 1, bottom + 1);
+    drawVerticalLine(context, x, top - 1, bottom + 1);
 
     if (computer.groundLevel != null) {
       float yGroundLevel = bottom - (computer.groundLevel + 64f) * blocksPerPixel;
-      fill(m, x - 3, yGroundLevel + 2, x, yFloor);
+      fill(context, x - 3, yGroundLevel + 2, x, yFloor);
     }
 
-    drawHorizontalLine(m, x - 6, x - 1, top);
-    drawHorizontalLine(m, x - 6, x - 1, yFloor);
-    drawHorizontalLine(m, x - 6, x - 1, bottom);
+    drawHorizontalLine(context, x - 6, x - 1, top);
+    drawHorizontalLine(context, x - 6, x - 1, yFloor);
+    drawHorizontalLine(context, x - 6, x - 1, bottom);
 
-    drawPointer(m, x, yAlt, 90);
+    drawPointer(context, x, yAlt, 90);
   }
 
 }

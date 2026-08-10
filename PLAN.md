@@ -41,9 +41,9 @@ Reference config: `github.com/FabricMC/fabric-example-mod` default branch
 
 | MC version | Fabric | NeoForge | Forge | Forgix merged jar |
 |---|---|---|---|---|
-| 26.2 (newest stable) | ☐ | ☐ | n/a — program scope (see below) | ☐ |
-| 1.21.4 | ☐ | ☐ | n/a — program scope (see below) | ☐ |
-| 1.20.1 | ☐ | n/a — structural, no NeoForge pre-1.20.2 | ☐ | ☐ |
+| 26.2 (newest stable) | ❌ | ☐ | n/a — program scope (see below) | ☐ |
+| 1.21.4 | 🔧 | ☐ | n/a — program scope (see below) | ☐ |
+| 1.20.1 | 🔧 | n/a — structural, no NeoForge pre-1.20.2 | ☐ | ☐ |
 | 1.19.4 | ☐ | n/a — structural, no NeoForge pre-1.20.2 | ☐ | ☐ |
 | 1.18.2 | ☐ | n/a — structural, no NeoForge pre-1.20.2 | ☐ | ☐ |
 
@@ -203,10 +203,53 @@ produces regardless of whether Forgix succeeds).
       `"minecraft": "~1.20.1"`, `"version": "1.0.0+mc1.20.1"` — both correct.
 
 ### Phase 2 — Port latest-first (Fabric only first, loaders after)
-- [ ] 1.21.4-fabric: DrawContext/RenderLayer delta from 1.20.1 (real compiler
-      errors, not assumption)
-- [ ] 26.2-fabric: no-mappings Loom config; Java 25 toolchain; rewrite
-      `HudComponent.fill()` for the post-1.21.6 render pipeline
+- [x] Architectural decision: port the whole shared tree to **Mojmap
+      uniformly** (all 5 MC versions), not a two-era Yarn/Mojmap split as
+      originally sketched in an earlier draft of this plan. Rationale: Yarn
+      mappings stop existing entirely past 1.21.11 (26.x is unobfuscated-only),
+      so a uniform-Mojmap tree avoids maintaining two parallel mapping
+      vocabularies for what's otherwise one shared source tree. Implemented by
+      dropping `yarn_mappings` from `versions/dependencies/{1.18.2,1.19.4,1.20.1}.properties`.
+- [x] 1.21.4-fabric: `:1.21.4-fabric:build` green. Real delta from 1.20.1,
+      confirmed via `javap` against the actual per-project Loom jar (not
+      assumption): `DrawContext`→`GuiGraphics` rename, `InGameHud`→`Gui`
+      rename, `MinecraftClient`→`Minecraft` + full Mojmap symbol table (see
+      CLAUDE.md porting notes), and `Gui.render(GuiGraphics, DeltaTracker)`
+      picked up a second `DeltaTracker` parameter vs. 1.20.1's
+      `render(DrawContext, float)` — handled with one Stonecutter
+      `//? if >=1.21.2 { ... } else { ... }` block in `InGameHudMixin.java`.
+      Also: `GuiGraphics.fill(int,int,int,int,int)` exists as a built-in
+      pose-aware primitive on this version, so `HudComponent.fill()` was
+      simplified to call it directly instead of hand-rolling
+      Tessellator/BufferBuilder/RenderSystem immediate-mode drawing — this
+      turned out to be a **simplification available starting at 1.21.4**, not
+      a "hottest cross-version risk spot" as an earlier draft of CLAUDE.md
+      assumed.
+- [x] 1.20.1-fabric: re-verified green under the new uniform-Mojmap tree
+      (previously green under the old Yarn-mapped tree pre-dating this
+      session's port). Confirms the shared-tree `//? if` branching in
+      `InGameHudMixin.java` resolves correctly for both eras.
+- [ ] 26.2-fabric: **attempted, blocked on a real architecture change, not a
+      simple rename.** Confirmed via `javap` against the actual 26.2 merged
+      jar: `GuiGraphics` **does not exist at all** in 26.2 — `Gui` no longer
+      has a `render(...)` method a mixin can inject into with a graphics
+      context. Instead `Gui` has
+      `extractRenderState(DeltaTracker, boolean, boolean)` writing into a
+      `net.minecraft.client.renderer.state.gui.GuiRenderState` object — a
+      render-state-extraction model (state is captured on this thread, then
+      consumed by a separate render pass), not the "just inject and draw"
+      model every earlier version uses. This is the real "post-1.21.6 render
+      pipeline rewrite" flagged in earlier drafts of CLAUDE.md, but the actual
+      shape of it (state-extraction object, not just a new draw API) wasn't
+      known until this `javap` pass. Needs dedicated research before porting:
+      how to append custom draw state to `GuiRenderState`/`GuiTextRenderState`
+      (or find the current equivalent mixin injection point), not yet done.
+      Also newly confirmed blocked on: `KeyMapping`'s 3-arg constructor now
+      takes a `KeyMapping.Category` (not a raw `String`) as its 3rd arg;
+      `KeyBindingHelper` and `ClientCommandManager` (Fabric API) were not
+      found under their 1.21.4 packages either — Fabric API's client-command
+      and keybinding-helper surface has moved/renamed by 26.2 and needs its
+      own `javap`/artifact-browsing pass against the 26.2 Fabric API jars.
 - [ ] 1.19.4-fabric: pre-DrawContext (`MatrixStack`-only) signatures
 - [ ] 1.18.2-fabric: same era as 1.19.4, confirm no additional delta
 
@@ -277,3 +320,41 @@ produces regardless of whether Forgix succeeds).
   requirements section with the real target matrix and a Quilt compatibility
   note, and checked off completed Phase 0/1 boxes above. Next: Phase 2,
   latest-first Fabric porting starting with 1.21.4-fabric.
+- 2026-08-10: Ported the full shared `src/main` tree to 1.21.4/Mojmap and got
+  `:1.21.4-fabric:build` green from a genuine failing baseline (full mapping
+  table + rationale in CLAUDE.md). While verifying the sibling `1.20.1-fabric`
+  node afterward, hit a real Stonecutter build-mechanics gotcha worth
+  recording: **the node marked `active` in `stonecutter.gradle.kts` must
+  actually match the current shape of the shared `src/main` tree**, or its
+  build fails referencing the *raw* tree (pre-`//? if` toggle) instead of a
+  correctly-generated per-node copy — plain `:<node>:build` does not fix this,
+  because the generate/prepare tasks that resync the active node's compile
+  input only run correctly as part of the *sanctioned* switch. The file's
+  `/* [SC] DO NOT EDIT */` comment is real: do not hand-edit the `active`
+  string. Instead run the public Gradle task Stonecutter registers per node —
+  found via `./gradlew :tasks --all` (case sensitivity matters; grepping
+  case-insensitively for "stonecutter" hides these because their *display*
+  names don't contain that word): `"Set active project to <mc>-<loader>"`
+  (e.g. `./gradlew "Set active project to 1.21.4-fabric"`). Used this to move
+  active from the stale `1.20.1-fabric` (left over from Phase 1) to
+  `1.21.4-fabric` (matching Phase 2's actual current focus and the tree's
+  current toggle-state); both `1.21.4-fabric` and `1.20.1-fabric` build green
+  afterward. Internal-only tasks confirmed *not* to be the right lever:
+  `stonecutterGenerate`/`stonecutterPrepare`/`stonecutterMerge` (+ `*Test`
+  variants) are explicitly "Internal Stonecutter task. Do not call manually."
+  Separately, switching the active node forces Gradle to configure every
+  declared node (Stonecutter needs the whole tree to build the switch-task
+  dependency graph, even with `--configure-on-demand`), which surfaced a
+  second real gap: `26.2-neoforge` couldn't configure at all because no
+  Java-25 toolchain was available and **no toolchain auto-provisioning
+  repository was configured** (`settings.gradle.kts` had no
+  `foojay-resolver-convention` plugin, despite CLAUDE.md's environment notes
+  already saying this project should rely on one). Fixed by adding
+  `id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"` to
+  `settings.gradle.kts`'s `plugins {}` block (an earlier attempt at `0.8.0`
+  failed with `JvmVendorSpec does not have member field 'IBM_SEMERU'` — that
+  plugin version predates this project's Gradle 9.3.1's toolchain API shape).
+  Attempted 26.2-fabric next per Phase 2's order; blocked on a real
+  architecture change (`GuiGraphics` removed entirely, replaced by a
+  render-state-extraction model) — see Phase 2 checklist above for the full
+  `javap`-confirmed finding. Not yet resolved; needs its own research pass.
