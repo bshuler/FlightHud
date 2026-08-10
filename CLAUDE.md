@@ -100,6 +100,24 @@ net.torocraft.flighthud/
   Document any change to this decision in PLAN.md.
 - Rendering itself (the actual point of this mod) is **not** loader-limited:
   Mixin-based HUD injection works the same way on Fabric, NeoForge, and Forge.
+- Loader coverage is otherwise mandatory, not best-effort: every MC version in
+  the matrix builds for every loader that structurally exists for it
+  (Fabric+NeoForge for 1.20.5+, Fabric+Forge for ≤1.20.4). See PLAN.md
+  "Structural loader blockers" for the two cases where a cell is intentionally
+  absent and why.
+- **Quilt**: not a separate build target anywhere in this project. Quilt loads
+  standard Fabric mod jars natively (it reads `fabric.mod.json` directly), so
+  every `*-fabric` output is already Quilt-compatible with zero extra work.
+- **Forgix** (`io.github.pacifistmc.forgix`): per-MC-version jar merging, so
+  end users get one jar that works on either of that version's loaders
+  instead of picking the right one. Verified alive (GitHub `PacifistMC/Forgix`,
+  pushed 2026-08-10, stable `2.0.0` tag) and composable with Stonecutter, with
+  one wrinkle: Forgix's default subproject autodetection expects flat names
+  like `:fabric`/`:forge`, but Stonecutter names its nodes `<mc>-<loader>`
+  (e.g. `26.2-neoforge`), so each MC version needs an explicit `inputJar`
+  override in the `forgix { }` block rather than relying on autodetection. See
+  PLAN.md "Forgix" section for the full investigation and wiring plan; this
+  lands in Phase 4, after per-loader jars are confirmed building.
 
 ## Build System: Stonecutter + Stonecraft
 
@@ -142,15 +160,22 @@ modernization program:
 
 | MC version | Fabric | NeoForge | Forge |
 |---|---|---|---|
-| newest stable (see PLAN.md — was `26.2` at time of writing) | target | target | n/a (NeoForge only post-1.20.2 split) |
-| 1.21.4 | target | target | n/a |
-| 1.20.1 | target | n/a | target |
-| 1.19.4 | target | n/a | target |
-| 1.18.2 | target | n/a | target |
+| newest stable (see PLAN.md — was `26.2` at time of writing) | target | target | n/a (program scope) |
+| 1.21.4 | target | target | n/a (program scope) |
+| 1.20.1 | target | n/a (structural) | target |
+| 1.19.4 | target | n/a (structural) | target |
+| 1.18.2 | target | n/a (structural) | target |
 
-NeoForge does not exist before the Forge/NeoForge split at 1.20.2, and Forge is
-not targeted for the two newest MC versions per the program's matrix — mirrors
-the same reasoning `critical-orientation` used.
+NeoForge does not exist before the Forge/NeoForge split at 1.20.2 — that's a
+structural fact about the loader ecosystem, not a scope choice. Forge is not
+targeted for the two newest MC versions per the program's explicit brief
+(mirrors `critical-orientation`'s reasoning) even though Forge itself
+continues to exist in parallel with NeoForge past 1.20.2 — that one is a
+program-level scope decision, recorded as such rather than implied to be a
+structural impossibility. Every cell that IS targeted is mandatory — loader
+coverage is not "if feasible." Quilt is not a separate column: it loads
+`*-fabric` jars natively. See PLAN.md "Forgix" section for the plan to merge
+each version's per-loader jars into one combined jar.
 
 ## Porting notes by MC version (fill in / correct as work proceeds)
 

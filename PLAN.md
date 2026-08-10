@@ -39,13 +39,16 @@ Reference config: `github.com/FabricMC/fabric-example-mod` default branch
 
 ## Target matrix
 
-| MC version | Fabric | NeoForge | Forge |
-|---|---|---|---|
-| 26.2 (newest stable) | ☐ | ☐ | n/a — NeoForge/Forge split, no Forge post-1.20.2 |
-| 1.21.4 | ☐ | ☐ | n/a |
-| 1.20.1 | ☐ | n/a | ☐ |
-| 1.19.4 | ☐ | n/a | ☐ |
-| 1.18.2 | ☐ | n/a | ☐ |
+| MC version | Fabric | NeoForge | Forge | Forgix merged jar |
+|---|---|---|---|---|
+| 26.2 (newest stable) | ☐ | ☐ | n/a — program scope (see below) | ☐ |
+| 1.21.4 | ☐ | ☐ | n/a — program scope (see below) | ☐ |
+| 1.20.1 | ☐ | n/a — structural, no NeoForge pre-1.20.2 | ☐ | ☐ |
+| 1.19.4 | ☐ | n/a — structural, no NeoForge pre-1.20.2 | ☐ | ☐ |
+| 1.18.2 | ☐ | n/a — structural, no NeoForge pre-1.20.2 | ☐ | ☐ |
+
+Quilt: no separate column — every `*-fabric` jar is Quilt-compatible as-is
+(Quilt loads Fabric mod jars natively). Documented, not built separately.
 
 (☐ = not yet attempted, 🔧 = in progress, ✅ = `chiseledBuild` green, ❌ = attempted,
 blocked — see notes with real error evidence, 🟡 = building with a documented
@@ -58,6 +61,91 @@ scope reduction.)
   a deliberate descope for engineering economy, not a rendering-feasibility
   problem — Mixin-based HUD rendering itself is NOT loader-limited (NeoForge and
   Forge both support SpongePowered Mixin declaratively).
+
+## Updated requirement (2026-08-10): loader coverage is mandatory
+
+Bert's follow-up instruction, applied on top of the original brief: **every MC
+version target must build for every loader viable on that version** — this is
+not new work, it's a confirmation of what the matrix below already commits to
+(Fabric+NeoForge for 1.20.5+, Fabric+Forge for ≤1.20.4). No loader cell may be
+silently dropped; any genuinely blocked cell must be documented here with the
+concrete blocker, not just omitted.
+
+**Quilt**: not a separate build target. Quilt loads standard Fabric mod jars
+natively (its `ModMetadataReader` understands `fabric.mod.json` directly), so
+every `*-fabric` jar this project produces is already Quilt-compatible with no
+extra Stonecutter node. Documented here and in CLAUDE.md/README rather than
+added as a matrix column.
+
+**Structural loader blockers** (loaders that do not exist for a given MC
+version — not a feasibility choice, a fact about the loader ecosystem):
+- NeoForge does not exist before the Forge/NeoForge split at MC 1.20.2 — no
+  NeoForge cell for 1.20.1, 1.19.4, or 1.18.2.
+- Forge is not being targeted for 26.2/1.21.4 in this matrix per the original
+  program brief's explicit version/loader assignment (`fabric+neoforge` for the
+  two newest versions, `fabric+forge` for the three legacy versions) — Forge
+  itself does still exist in parallel with NeoForge post-1.20.2, so this is a
+  program-level scope choice, not a structural impossibility. Flagging the
+  distinction here per the instruction to record blockers precisely.
+
+### Forgix — single merged all-loader jar (investigated 2026-08-10)
+
+Bert asked whether the **Forgix** Gradle plugin (`io.github.pacifistmc.forgix`,
+`PacifistMC/Forgix` on GitHub) can merge each MC version's per-loader jars into
+one combined "works on any loader" jar, and whether it composes with the
+Stonecutter/Stonecraft toolchain.
+
+**Maintenance status — verified live, not from memory:**
+- GitHub repo pushed **2026-08-10** (today), not archived.
+- Latest tag is a **stable `2.0.0`** release (not just a snapshot); prior
+  snapshot line (`2.0.0-SNAPSHOT.3` through `.6`) runs May 2025 → Aug 2026.
+- Published and resolvable on the Gradle Plugin Portal as
+  `io.github.pacifistmc.forgix` version `2.0.0`.
+- The project's own README preemptively addresses "this project feels dead":
+  the author's position is it's loader/MC-independent by design and needs
+  little maintenance, and "the chances are it'll still work" even if unmaintained.
+- **Conclusion: alive and current as of this plan.** Not dead.
+
+**How it works**: Forgix repackages each loader's compiled classes under
+loader-specific packages so the JVM only ever loads the entry point the active
+loader calls (Fabric via `fabric.mod.json`, Forge/NeoForge via their mod
+descriptors), then jars them all together. It operates on a `mergeJars` task
+configured with per-loader `inputJar` file references — by default it
+autodetects subprojects literally named `:fabric`/`:forge`/`:neoforge`/etc.,
+with an override (`inputJar = project(":x").tasks.shadowJar.archiveFile`) for
+anything that doesn't match that naming convention.
+
+**Composability with Stonecutter/Stonecraft — the real complication**:
+Stonecutter's project model does not give every version+loader combination a
+uniformly-addressable subproject: the physical root project *is* whichever
+node is currently marked `active` in `stonecutter.gradle.kts` (no path
+prefix), while every other node is a real Gradle subproject named
+`<mc>-<loader>` (e.g. `26.2-neoforge`). Forgix's autodetection assumes flat
+loader-named subprojects (`:fabric`, `:forge`), which will not match Stonecutter's
+`<mc>-<loader>` naming, so Forgix needs explicit `inputJar` overrides — one
+Forgix configuration block per Minecraft version, each pointing at that
+version's two per-loader subproject jar outputs (e.g. for MC 26.2:
+`fabric { inputJar = project(":26.2-fabric").tasks.named("remapJar")... }`,
+`neoforge { inputJar = project(":26.2-neoforge").tasks.named("remapJar")... }`).
+No existing public example wires Forgix through Stonecutter/Stonecraft
+specifically (checked via GitHub code search) — this pairing is unproven in
+the wild, though nothing in either tool's design rules it out.
+
+**Decision: adopt it, wired explicitly per MC version.** Not dead, not
+structurally incompatible — the added complexity is bookkeeping (naming), not
+a blocker. Plan: apply the Forgix plugin at the true Gradle root
+(`stonecutter.gradle.kts`, since that's the file that's actually the physical
+root project's build script regardless of which node is "active"), add one
+`forgix { ... }` per-MC-version merge configuration once each version's two
+loader cells build green, and verify the merged jar loads on both loaders
+before calling a version's Forgix wiring "done." This work happens in Phase 4
+(Verification) after the per-loader `chiseledBuild` matrix is green — merging
+broken or nonexistent per-loader jars first would just produce a broken merged
+jar with an extra layer of indirection to debug through. Tracked as its own
+checklist item below; if real build evidence shows the naming workaround
+doesn't hold up, this section will be updated with the actual error and a
+fallback to per-loader jars (which Stonecraft's `chiseledBuild` already
+produces regardless of whether Forgix succeeds).
 
 ## Status checklist
 
@@ -103,6 +191,15 @@ scope reduction.)
 ### Phase 4 — Verification
 - [ ] `./gradlew chiseledBuild` green for every matrix cell (or documented
       exception with real error evidence)
+- [ ] Wire Forgix (`io.github.pacifistmc.forgix` `2.0.0`) at the physical root
+      build script; one `forgix { }` block per MC version with explicit
+      `inputJar` overrides pointing at that version's `<mc>-fabric` /
+      `<mc>-forge` / `<mc>-neoforge` subproject jars (see "Forgix" section
+      above for why the default autodetection won't match Stonecutter's
+      subproject names)
+- [ ] Verify each merged jar actually loads under both of its constituent
+      loaders (not just that `mergeJars` succeeds)
+- [ ] README/CLAUDE.md note confirming Quilt compatibility via Fabric jars
 - [ ] PLAN.md status table fully updated
 - [ ] Final commit(s) pushed to `origin/main`
 
@@ -110,3 +207,29 @@ scope reduction.)
 
 - 2026-08-10: Repo analysis complete, upstream confirmed stale, newest stable
   MC confirmed live as 26.2, docs written. Starting Phase 0 commit next.
+- 2026-08-10: Confirmed the current, working Stonecutter/Stonecraft DSL against
+  live sources (`meza/Stonecraft-template`, `meza/Stonecraft` e2e fixtures +
+  `Dependencies.kt`) rather than copying `critical-orientation`'s template,
+  whose pinned versions no longer resolve to a working DSL in this environment
+  (confirmed via a live failed sanity build: `Unresolved reference 'vcsVersion'`
+  under a resolved Stonecutter 0.8.4 runtime despite the file declaring "0.5").
+  Confirmed `versions/dependencies/<mc>.properties` key schema: always
+  `minecraft_version`/`loader_version`/`fabric_version`; `neoforge_version` for
+  NeoForge cells; `forge_version` for Forge cells; `yarn_mappings` (+
+  `yarn_mappings_neoforge_patch` if that version also has a NeoForge cell) for
+  any MC version ≤1.21.11 that needs legacy Yarn mappings instead of the
+  Mojmap default; omit `yarn_mappings` entirely for MC ≥26.1 (unobfuscated).
+- 2026-08-10: Bert added a binding requirement update: loader coverage across
+  the matrix is mandatory (not "if feasible"), Quilt compatibility must be
+  documented (no separate build target — Quilt loads Fabric jars natively),
+  and the Forgix jar-merging plugin must be investigated and wired in if alive
+  and compatible. Investigated live: Forgix (`io.github.pacifistmc.forgix`) is
+  actively maintained (pushed today, stable `2.0.0` tag exists), composes with
+  Stonecutter/Stonecraft in principle but needs explicit per-version
+  `inputJar` overrides because Stonecutter's `<mc>-<loader>` subproject naming
+  doesn't match Forgix's flat `:fabric`/`:forge` autodetection convention — see
+  "Forgix" section above. Decision: adopt it, wire per version in Phase 4 once
+  real per-loader jars exist to merge. Original target matrix already matched
+  the mandated loader-viability rule (Fabric+NeoForge for 1.20.5+, Fabric+Forge
+  for ≤1.20.4) with no change needed to the matrix itself — added explicit
+  "structural blocker" language per-cell instead of bare "n/a".
