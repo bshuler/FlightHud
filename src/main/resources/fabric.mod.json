@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "flighthud",
+  "id": "${id}",
   "version": "${version}",
-  "name": "Flight HUD",
-  "description": "Displays a flight styled hud while flying with elytra.",
+  "name": "${name}",
+  "description": "${description}",
   "authors": [
     "ToroCraft"
   ],
@@ -20,13 +20,10 @@
       "net.torocraft.flighthud.FlightHud"
     ]
   },
-  "mixins": [
-    "flighthud.mixins.json"
-  ],
   "depends": {
     "fabricloader": ">=0.14.18",
     "fabric-api": "*",
-    "minecraft": "${minecraft_dependency}",
-    "java": ">=17"
+    "minecraft": "${fabricMinecraftVersionRange}",
+    "java": ">=${javaVersion}"
   }
 }

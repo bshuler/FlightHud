@@ -1,0 +1,26 @@
+modLoader = "javafml"
+loaderVersion = "${loaderVersionRange}"
+license = "GPL3"
+issueTrackerURL = "https://github.com/frodare/FlightHud/issues"
+
+[[mods]]
+modId = "${id}"
+version = "${version}"
+displayName = "${name}"
+description = '''${description}'''
+authors = "ToroCraft"
+displayURL = "https://www.curseforge.com/minecraft/mc-mods/flight-hud"
+
+[[dependencies.${id}]]
+modId = "forge"
+mandatory = true
+versionRange = "${forgeVersionRange}"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.${id}]]
+modId = "minecraft"
+mandatory = true
+versionRange = "${minecraftVersionRange}"
+ordering = "NONE"
+side = "CLIENT"

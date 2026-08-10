@@ -1,7 +1,7 @@
 package net.torocraft.flighthud.components;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.torocraft.flighthud.FlightCanvas;
 import net.torocraft.flighthud.Dimensions;
 import net.torocraft.flighthud.FlightComputer;
 import net.torocraft.flighthud.HudComponent;
@@ -16,7 +16,7 @@ public class SpeedIndicator extends HudComponent {
   }
 
   @Override
-  public void render(GuiGraphics context, float partial, Minecraft mc) {
+  public void render(FlightCanvas context, float partial, Minecraft mc) {
     float top = dim.tFrame;
     float bottom = dim.bFrame;
 

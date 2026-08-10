@@ -1,13 +1,10 @@
 package net.torocraft.flighthud;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
 import net.torocraft.flighthud.config.HudConfig;
 
 public abstract class HudComponent {
-  public abstract void render(GuiGraphics context, float tickDelta, Minecraft client);
+  public abstract void render(FlightCanvas context, float tickDelta, Minecraft client);
 
   public static HudConfig CONFIG;
 
@@ -15,14 +12,13 @@ public abstract class HudComponent {
     return (int) Math.round(d);
   }
 
-  protected void drawPointer(GuiGraphics context, float x, float y, float rot) {
-    PoseStack pose = context.pose();
-    pose.pushPose();
-    pose.translate(x, y, 0);
-    pose.mulPose(Axis.ZP.rotationDegrees(rot + 45));
+  protected void drawPointer(FlightCanvas context, float x, float y, float rot) {
+    context.pushPose();
+    context.translate(x, y);
+    context.rotateDegrees(rot + 45);
     drawVerticalLine(context, 0, 0, 5);
     drawHorizontalLine(context, 0, 5, 0);
-    pose.popPose();
+    context.popPose();
   }
 
   protected float wrapHeading(float degrees) {
@@ -33,29 +29,29 @@ public abstract class HudComponent {
     return degrees;
   }
 
-  protected void drawFont(Minecraft mc, GuiGraphics context, String s, float x, float y) {
+  protected void drawFont(Minecraft mc, FlightCanvas context, String s, float x, float y) {
     drawFont(mc, context, s, x, y, CONFIG.color);
   }
 
-  protected void drawFont(Minecraft mc, GuiGraphics context, String s, float x, float y,
+  protected void drawFont(Minecraft mc, FlightCanvas context, String s, float x, float y,
       int color) {
-    context.drawString(mc.font, s, (int) x, (int) y, CONFIG.color, false);
+    context.drawText(mc.font, s, (int) x, (int) y, CONFIG.color, false);
   }
 
-  protected void drawRightAlignedFont(Minecraft mc, GuiGraphics context, String s, float x,
+  protected void drawRightAlignedFont(Minecraft mc, FlightCanvas context, String s, float x,
       float y) {
     int w = mc.font.width(s);
     drawFont(mc, context, s, x - w, y);
   }
 
-  protected void drawBox(GuiGraphics context, float x, float y, float w, float h) {
+  protected void drawBox(FlightCanvas context, float x, float y, float w, float h) {
     drawHorizontalLine(context, x, x + w, y);
     drawHorizontalLine(context, x, x + w, y + h);
     drawVerticalLine(context, x, y, y + h);
     drawVerticalLine(context, x + w, y, y + h);
   }
 
-  protected void drawHorizontalLineDashed(GuiGraphics context, float x1, float x2, float y,
+  protected void drawHorizontalLineDashed(FlightCanvas context, float x1, float x2, float y,
       int dashCount) {
     float width = x2 - x1;
     int segmentCount = dashCount * 2 - 1;
@@ -75,7 +71,7 @@ public abstract class HudComponent {
     }
   }
 
-  protected void drawHorizontalLine(GuiGraphics context, float x1, float x2, float y) {
+  protected void drawHorizontalLine(FlightCanvas context, float x1, float x2, float y) {
     if (x2 < x1) {
       float i = x1;
       x1 = x2;
@@ -85,7 +81,7 @@ public abstract class HudComponent {
         y + CONFIG.halfThickness);
   }
 
-  protected void drawVerticalLine(GuiGraphics context, float x, float y1, float y2) {
+  protected void drawVerticalLine(FlightCanvas context, float x, float y1, float y2) {
     if (y2 < y1) {
       float i = y1;
       y1 = y2;
@@ -96,11 +92,11 @@ public abstract class HudComponent {
         y2 - CONFIG.halfThickness);
   }
 
-  // GuiGraphics.fill() is a built-in, pose-aware colored-quad primitive that
-  // already applies context.pose()'s current transform -- no need to hand-roll
-  // the immediate-mode Tessellator/BufferBuilder/RenderSystem plumbing the
-  // pre-1.20 codebase used, since DrawContext/GuiGraphics didn't exist then.
-  protected void fill(GuiGraphics context, float x1, float y1, float x2, float y2) {
+  // FlightCanvas.fill() is a pose-aware colored-quad primitive; the version-
+  // specific adapter (PlatformCanvas) is responsible for applying whatever the
+  // current platform's transform-stack equivalent is (PoseStack pre-26.1,
+  // Matrix3x2fStack at 26.1+) -- this class never touches either directly.
+  protected void fill(FlightCanvas context, float x1, float y1, float x2, float y2) {
     int color = CONFIG.color;
     context.fill(i(Math.min(x1, x2)), i(Math.min(y1, y2)), i(Math.max(x1, x2)),
         i(Math.max(y1, y2)), color);

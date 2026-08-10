@@ -1,8 +1,6 @@
 package net.torocraft.flighthud;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
 import net.torocraft.flighthud.components.AltitudeIndicator;
 import net.torocraft.flighthud.components.ElytraHealthIndicator;
 import net.torocraft.flighthud.components.FlightPathIndicator;
@@ -43,7 +41,7 @@ public class HudRenderer extends HudComponent {
   }
 
   @Override
-  public void render(GuiGraphics context, float tickDelta, Minecraft client) {
+  public void render(FlightCanvas context, float tickDelta, Minecraft client) {
     setupConfig(client);
 
     if (HudComponent.CONFIG == null) {
@@ -52,12 +50,11 @@ public class HudRenderer extends HudComponent {
 
     try {
 
-      PoseStack m = context.pose();
-      m.pushPose();
+      context.pushPose();
 
       if (HudComponent.CONFIG.scale != 1d) {
         float scale = 1 / (float) HudComponent.CONFIG.scale;
-        m.scale(scale, scale, scale);
+        context.scale(scale, scale);
       }
 
       computer.update(client, tickDelta);
@@ -66,7 +63,7 @@ public class HudRenderer extends HudComponent {
       for (HudComponent component : components) {
         component.render(context, tickDelta, client);
       }
-      m.popPose();
+      context.popPose();
     } catch (Exception e) {
       e.printStackTrace();
     }
