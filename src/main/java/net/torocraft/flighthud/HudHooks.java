@@ -20,18 +20,18 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.common.NeoForge;
 *///?} elif forge && <1.19 {
-/*import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraftforge.client.gui.ForgeIngameGui;
 import net.minecraftforge.client.gui.OverlayRegistry;
-*///?} elif forge && <1.20 {
+//?} elif forge && <1.20 {
 /*import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraftforge.client.event.RegisterGuiOverlaysEvent;
 import net.minecraftforge.client.gui.overlay.ForgeGui;
 *///?} elif forge {
-import net.minecraft.client.gui.GuiGraphics;
+/*import net.minecraft.client.gui.GuiGraphics;
 import net.minecraftforge.client.event.RegisterGuiOverlaysEvent;
 import net.minecraftforge.client.gui.overlay.ForgeGui;
-//?}
+*///?}
 
 import net.minecraft.client.Minecraft;
 
@@ -82,27 +82,33 @@ public final class HudHooks {
         HUD.render(new PlatformCanvas(event.getGuiGraphics()),
             event.getPartialTick().getGameTimeDeltaPartialTick(false), Minecraft.getInstance()));
     *///?} elif forge && <1.19 {
-    /*OverlayRegistry.registerOverlayTop("flighthud",
+    OverlayRegistry.registerOverlayTop("flighthud",
         (ForgeIngameGui gui, PoseStack poseStack, float tickDelta, int width, int height) ->
             HUD.render(new PlatformCanvas(poseStack), tickDelta, Minecraft.getInstance()));
-    *///?}
+    //?}
     // forge>=1.19 is intentionally absent here: RegisterGuiOverlaysEvent must be
     // registered on the mod event bus at construction time, not called
     // imperatively -- see registerOverlays(...) below and its wiring in
     // FlightHud.java's constructor.
   }
 
-  //? if forge && <1.20 {
+  // forge<1.19 (1.18.2) intentionally has NO registerOverlays method: it
+  // doesn't use the event-based RegisterGuiOverlaysEvent registration at all
+  // -- it registers imperatively via OverlayRegistry in register() above
+  // instead (RegisterGuiOverlaysEvent/ForgeGui don't even resolve against the
+  // 1.18.2 Forge jar). The empty first branch below is deliberate.
+  //? if forge && <1.19 {
+  //?} elif forge && <1.20 {
   /*public static void registerOverlays(RegisterGuiOverlaysEvent event) {
     event.registerAboveAll("flighthud",
         (ForgeGui gui, PoseStack poseStack, float tickDelta, int width, int height) ->
             HUD.render(new PlatformCanvas(poseStack), tickDelta, Minecraft.getInstance()));
   }
   *///?} elif forge {
-  public static void registerOverlays(RegisterGuiOverlaysEvent event) {
+  /*public static void registerOverlays(RegisterGuiOverlaysEvent event) {
     event.registerAboveAll("flighthud",
         (ForgeGui gui, GuiGraphics context, float tickDelta, int width, int height) ->
             HUD.render(new PlatformCanvas(context), tickDelta, Minecraft.getInstance()));
   }
-  //?}
+  *///?}
 }

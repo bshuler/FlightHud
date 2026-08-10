@@ -17,20 +17,20 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.common.NeoForge;
 *///?} elif forge && <1.19 {
-/*import net.minecraftforge.client.ClientRegistry;
+import net.minecraftforge.client.ClientRegistry;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-*///?} elif forge {
-import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
+//?} elif forge {
+/*import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-//?}
+*///?}
 
 //? if fabric && >=26.1 {
 /*import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
@@ -38,10 +38,16 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 /*import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 *///?}
 
+// The Fabric client command API (v2) doesn't exist at all in 1.18.2's Fabric
+// API bundle (confirmed: no fabric-command-api-v2 artifact resolves for that
+// version, unlike every other node in the matrix) -- the "/flighthud toggle"
+// command is already a deliberate Fabric-only scope reduction (see CLAUDE.md
+// "Multi-loader scope decisions"), so 1.18.2 drops it too rather than forking
+// in a second command API generation just for one version.
 //? if fabric && >=26.1 {
 /*import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
-*///?} elif fabric {
+*///?} elif fabric && >=1.19 {
 /*import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 *///?}
@@ -113,7 +119,9 @@ public class FlightHud {
   public void onInitializeClient() {
     loadConfig();
     setupKeyCode();
-    setupCommand();
+    //? if >=1.19 {
+    /^setupCommand();
+    ^///?}
     HudHooks.register();
   }
   *///?} elif neoforge {
@@ -129,7 +137,7 @@ public class FlightHud {
     event.register(keyBinding);
   }
   *///?} elif forge && <1.19 {
-  /*public FlightHud() {
+  public FlightHud() {
     FMLJavaModLoadingContext.get().getModEventBus().addListener(this::onClientSetup);
   }
 
@@ -146,8 +154,8 @@ public class FlightHud {
       onClientTick();
     }
   }
-  *///?} elif forge {
-  public FlightHud() {
+  //?} elif forge {
+  /*public FlightHud() {
     FMLJavaModLoadingContext.get().getModEventBus().addListener(this::onClientSetup);
     FMLJavaModLoadingContext.get().getModEventBus().addListener(this::onRegisterKeyMappings);
     FMLJavaModLoadingContext.get().getModEventBus().addListener(HudHooks::registerOverlays);
@@ -168,7 +176,7 @@ public class FlightHud {
       onClientTick();
     }
   }
-  //?}
+  *///?}
 
   private static void loadConfig() {
     CONFIG_LOADER_SETTINGS.load();
@@ -197,7 +205,7 @@ public class FlightHud {
     }
   }
 
-  //? if fabric {
+  //? if fabric && >=1.19 {
   /*private static void setupCommand() {
     ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
       //? if >=26.1 {

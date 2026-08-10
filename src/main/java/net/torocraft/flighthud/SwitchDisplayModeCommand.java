@@ -5,7 +5,7 @@ package net.torocraft.flighthud;
 // scope reduction (the keybind covers every loader) -- see FlightHud's CLAUDE.md
 // "Multi-loader scope decisions". On non-fabric nodes this whole file compiles
 // down to just the package statement (a valid, empty compilation unit).
-//? if fabric {
+//? if fabric && >=1.19 {
 /*import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;

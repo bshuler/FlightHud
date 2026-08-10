@@ -1,15 +1,15 @@
 package net.torocraft.flighthud;
 
 //? if <1.20 {
-/*import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.gui.GuiComponent;
-*///?} elif >=26.1 {
+//?} elif >=26.1 {
 /*import net.minecraft.client.gui.GuiGraphicsExtractor;
 import org.joml.Matrix3x2fStack;
 *///?} else {
-import com.mojang.blaze3d.vertex.PoseStack;
+/*import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.gui.GuiGraphics;
-//?}
+*///?}
 
 import net.minecraft.client.gui.Font;
 
@@ -38,7 +38,7 @@ import net.minecraft.client.gui.Font;
 public final class PlatformCanvas implements FlightCanvas {
 
   //? if <1.20 {
-  /*private final PoseStack pose;
+  private final PoseStack pose;
 
   public PlatformCanvas(PoseStack pose) {
     this.pose = pose;
@@ -75,14 +75,25 @@ public final class PlatformCanvas implements FlightCanvas {
 
   @Override
   public void rotateDegrees(float degrees) {
-    pose.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(degrees));
+    // com.mojang.math.Axis doesn't exist in 1.18.2 (confirmed via javap: it
+    // was introduced alongside PoseStack.mulPose(Quaternion) -> mulPose(JOML
+    // Quaternionf) switching between 1.18.2 and 1.19.4) -- 1.18.2 needs the
+    // older Vector3f.ZP.rotationDegrees(float), which returns the pre-JOML
+    // com.mojang.math.Quaternion matching its PoseStack.mulPose(Quaternion)
+    // overload; 1.19.4 already has Axis (returning org.joml.Quaternionf,
+    // matching its PoseStack.mulPose(Quaternionf) overload).
+    //? if <1.19 {
+    pose.mulPose(com.mojang.math.Vector3f.ZP.rotationDegrees(degrees));
+    //?} else {
+    /*pose.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(degrees));
+    *///?}
   }
 
   @Override
   public void scale(float x, float y) {
     pose.scale(x, y, 1);
   }
-  *///?} elif >=26.1 {
+  //?} elif >=26.1 {
   /*private final GuiGraphicsExtractor context;
 
   public PlatformCanvas(GuiGraphicsExtractor context) {
@@ -124,7 +135,7 @@ public final class PlatformCanvas implements FlightCanvas {
     context.pose().scale(x, y);
   }
   *///?} else {
-  private final GuiGraphics context;
+  /*private final GuiGraphics context;
 
   public PlatformCanvas(GuiGraphics context) {
     this.context = context;
@@ -164,5 +175,5 @@ public final class PlatformCanvas implements FlightCanvas {
   public void scale(float x, float y) {
     context.pose().scale(x, y, 1);
   }
-  //?}
+  *///?}
 }
