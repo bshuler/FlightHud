@@ -26,3 +26,8 @@ bin/
 # fabric
 
 run/
+
+# stonecutter — generated per (mc version, loader) node; keep hand-authored
+# versions/dependencies/*.properties tracked
+versions/*/
+!versions/dependencies/
