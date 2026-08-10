@@ -7,16 +7,19 @@ package net.torocraft.flighthud;
 import net.minecraft.client.gui.GuiGraphics;
 *///?} elif fabric && >=26.1 {
 /*import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.resources.Identifier;
 *///?} elif fabric {
 /*import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.GuiGraphics;
 *///?}
 //? if neoforge {
+/*import net.minecraft.client.DeltaTracker;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.common.NeoForge;
-//?} elif forge && <1.19 {
+*///?} elif forge && <1.19 {
 /*import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraftforge.client.gui.ForgeIngameGui;
 import net.minecraftforge.client.gui.OverlayRegistry;
@@ -25,12 +28,11 @@ import net.minecraftforge.client.gui.OverlayRegistry;
 import net.minecraftforge.client.event.RegisterGuiOverlaysEvent;
 import net.minecraftforge.client.gui.overlay.ForgeGui;
 *///?} elif forge {
-/*import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraftforge.client.event.RegisterGuiOverlaysEvent;
 import net.minecraftforge.client.gui.overlay.ForgeGui;
-*///?}
+//?}
 
-import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 
 /**
@@ -76,10 +78,10 @@ public final class HudHooks {
         HUD.render(new PlatformCanvas(context),
             deltaTracker.getGameTimeDeltaPartialTick(false), Minecraft.getInstance()));
     *///?} elif neoforge {
-    NeoForge.EVENT_BUS.addListener((RenderGuiEvent.Post event) ->
+    /*NeoForge.EVENT_BUS.addListener((RenderGuiEvent.Post event) ->
         HUD.render(new PlatformCanvas(event.getGuiGraphics()),
             event.getPartialTick().getGameTimeDeltaPartialTick(false), Minecraft.getInstance()));
-    //?} elif forge && <1.19 {
+    *///?} elif forge && <1.19 {
     /*OverlayRegistry.registerOverlayTop("flighthud",
         (ForgeIngameGui gui, PoseStack poseStack, float tickDelta, int width, int height) ->
             HUD.render(new PlatformCanvas(poseStack), tickDelta, Minecraft.getInstance()));
@@ -97,10 +99,10 @@ public final class HudHooks {
             HUD.render(new PlatformCanvas(poseStack), tickDelta, Minecraft.getInstance()));
   }
   *///?} elif forge {
-  /*public static void registerOverlays(RegisterGuiOverlaysEvent event) {
+  public static void registerOverlays(RegisterGuiOverlaysEvent event) {
     event.registerAboveAll("flighthud",
         (ForgeGui gui, GuiGraphics context, float tickDelta, int width, int height) ->
             HUD.render(new PlatformCanvas(context), tickDelta, Minecraft.getInstance()));
   }
-  *///?}
+  //?}
 }

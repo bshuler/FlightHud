@@ -4,12 +4,12 @@ package net.torocraft.flighthud;
 /*import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.gui.GuiComponent;
 *///?} elif >=26.1 {
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+/*import net.minecraft.client.gui.GuiGraphicsExtractor;
 import org.joml.Matrix3x2fStack;
-//?} else {
-/*import com.mojang.blaze3d.vertex.PoseStack;
+*///?} else {
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.gui.GuiGraphics;
-*///?}
+//?}
 
 import net.minecraft.client.gui.Font;
 
@@ -83,7 +83,7 @@ public final class PlatformCanvas implements FlightCanvas {
     pose.scale(x, y, 1);
   }
   *///?} elif >=26.1 {
-  private final GuiGraphicsExtractor context;
+  /*private final GuiGraphicsExtractor context;
 
   public PlatformCanvas(GuiGraphicsExtractor context) {
     this.context = context;
@@ -123,8 +123,8 @@ public final class PlatformCanvas implements FlightCanvas {
   public void scale(float x, float y) {
     context.pose().scale(x, y);
   }
-  //?} else {
-  /*private final GuiGraphics context;
+  *///?} else {
+  private final GuiGraphics context;
 
   public PlatformCanvas(GuiGraphics context) {
     this.context = context;
@@ -164,5 +164,5 @@ public final class PlatformCanvas implements FlightCanvas {
   public void scale(float x, float y) {
     context.pose().scale(x, y, 1);
   }
-  *///?}
+  //?}
 }

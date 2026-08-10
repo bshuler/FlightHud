@@ -11,12 +11,12 @@ import org.lwjgl.glfw.GLFW;
 /*import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 *///?} elif neoforge {
-import net.neoforged.bus.api.IEventBus;
+/*import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.common.NeoForge;
-//?} elif forge && <1.19 {
+*///?} elif forge && <1.19 {
 /*import net.minecraftforge.client.ClientRegistry;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
@@ -24,13 +24,13 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 *///?} elif forge {
-/*import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
+import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-*///?}
+//?}
 
 //? if fabric && >=26.1 {
 /*import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
@@ -55,8 +55,8 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallba
 // else (String) branches are actually reachable, but the >=1.21.9 (ResourceLocation)
 // branch is kept for parity with critical-orientation and future-proofing.
 //? if >=1.21.11 {
-import net.minecraft.resources.Identifier;
-//?} elif >=1.21.9 {
+/*import net.minecraft.resources.Identifier;
+*///?} elif >=1.21.9 {
 /*import net.minecraft.resources.ResourceLocation;
 *///?}
 
@@ -69,12 +69,12 @@ import net.minecraft.resources.Identifier;
 //? if fabric {
 /*public class FlightHud implements ClientModInitializer {
 *///?} elif neoforge {
-@Mod(FlightHud.MODID)
-public class FlightHud {
-//?} elif forge {
 /*@Mod(FlightHud.MODID)
 public class FlightHud {
-*///?}
+*///?} elif forge {
+@Mod(FlightHud.MODID)
+public class FlightHud {
+//?}
   public static final String MODID = "flighthud";
 
   public static SettingsConfig CONFIG_SETTINGS = new SettingsConfig();
@@ -97,14 +97,14 @@ public class FlightHud {
       config -> FlightHud.CONFIG_MIN = config);
 
   //? if >=1.21.11 {
-  private static final KeyMapping.Category CATEGORY =
+  /*private static final KeyMapping.Category CATEGORY =
       KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MODID, "main"));
-  //?} elif >=1.21.9 {
+  *///?} elif >=1.21.9 {
   /*private static final KeyMapping.Category CATEGORY =
       KeyMapping.Category.register(ResourceLocation.fromNamespaceAndPath(MODID, "main"));
   *///?} else {
-  /*private static final String CATEGORY = "category.flighthud.toggleDisplayMode";
-  *///?}
+  private static final String CATEGORY = "category.flighthud.toggleDisplayMode";
+  //?}
 
   private static KeyMapping keyBinding;
 
@@ -117,7 +117,7 @@ public class FlightHud {
     HudHooks.register();
   }
   *///?} elif neoforge {
-  public FlightHud(IEventBus modEventBus) {
+  /*public FlightHud(IEventBus modEventBus) {
     loadConfig();
     modEventBus.addListener(this::onRegisterKeyMappings);
     NeoForge.EVENT_BUS.addListener((ClientTickEvent.Post event) -> onClientTick());
@@ -128,7 +128,7 @@ public class FlightHud {
     setupKeyCode();
     event.register(keyBinding);
   }
-  //?} elif forge && <1.19 {
+  *///?} elif forge && <1.19 {
   /*public FlightHud() {
     FMLJavaModLoadingContext.get().getModEventBus().addListener(this::onClientSetup);
   }
@@ -147,7 +147,7 @@ public class FlightHud {
     }
   }
   *///?} elif forge {
-  /*public FlightHud() {
+  public FlightHud() {
     FMLJavaModLoadingContext.get().getModEventBus().addListener(this::onClientSetup);
     FMLJavaModLoadingContext.get().getModEventBus().addListener(this::onRegisterKeyMappings);
     FMLJavaModLoadingContext.get().getModEventBus().addListener(HudHooks::registerOverlays);
@@ -168,7 +168,7 @@ public class FlightHud {
       onClientTick();
     }
   }
-  *///?}
+  //?}
 
   private static void loadConfig() {
     CONFIG_LOADER_SETTINGS.load();
@@ -201,12 +201,12 @@ public class FlightHud {
   /*private static void setupCommand() {
     ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
       //? if >=26.1 {
-      dispatcher.register(ClientCommands.literal("flighthud")
+      /^dispatcher.register(ClientCommands.literal("flighthud")
           .then(ClientCommands.literal("toggle").executes(new SwitchDisplayModeCommand())));
-      //?} else {
-      /^dispatcher.register(ClientCommandManager.literal("flighthud")
+      ^///?} else {
+      dispatcher.register(ClientCommandManager.literal("flighthud")
           .then(ClientCommandManager.literal("toggle").executes(new SwitchDisplayModeCommand())));
-      ^///?}
+      //?}
     });
   }
   *///?}
