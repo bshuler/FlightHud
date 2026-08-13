@@ -51,6 +51,19 @@ dependencies {
     // Testing
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    // Tier 1 "loaded game" testing (Fabric cells only). fabric-loader-junit
+    // stands a real Fabric loader up inside the JUnit worker, which is what
+    // makes it legal for LoadedGameTest to call Bootstrap.bootStrap() and then
+    // assert against genuinely loaded game data - a real ItemStack(ELYTRA),
+    // the real item registry, vanilla's own Direction/Mth angle helpers.
+    //
+    // Fabric-only on purpose: NeoForge's equivalent bootstrap is junit-fml,
+    // and its supported loaded-test harness is ModDevGradle-only, unavailable
+    // under Architectury Loom - see the junit-fml exclusion comment below.
+    if (mod.isFabric) {
+        testImplementation("net.fabricmc:fabric-loader-junit:0.19.3")
+    }
 }
 
 // NeoForge's transitive net.neoforged.fancymodloader:junit-fml (<=9.0.18) auto-registers a

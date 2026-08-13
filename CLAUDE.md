@@ -273,6 +273,53 @@ addition to hand-rolled fakes for the pure `pollEvents()` branch logic — see
 `FileWatcherTest.java`'s class doc for why the fakes alone weren't enough to
 reach 100%.
 
+### Loaded-game tests (Tier 1)
+
+`src/test/java/net/torocraft/flighthud/LoadedGameTest.java` is different in kind
+from the rest of the suite: it runs against a **real, bootstrapped Minecraft and
+a real Fabric loader**, not mocks. `net.fabricmc:fabric-loader-junit` (declared
+under `if (mod.isFabric)`) stands the loader up inside the JUnit worker, which
+makes `SharedConstants.tryDetectVersion()` + `Bootstrap.bootStrap()` in
+`@BeforeAll` legal and the assertions afterwards meaningful.
+
+What it checks that a headless test cannot:
+
+1. **The item registry is really populated** — a guard on the harness itself, so
+   nothing else in the class can pass vacuously.
+2. **A real loader discovers this mod** from the processed `fabric.mod.json`
+   (Stonecraft templating already applied), exactly as the game would.
+3. **Every `depends` range in `fabric.mod.json` is satisfiable in this cell.**
+   A cell can build perfectly against a Minecraft its own declared range no
+   longer admits — a jar that ships and then refuses to load. The loader
+   resolves the ranges per cell here.
+4. **Heading agrees with vanilla's own compass** (`Direction.fromYRot`) and with
+   vanilla's own degree wrapping (`Mth.wrapDegrees`), swept −1080°→1080°.
+5. **The elytra health readout tracks a real `ItemStack(Items.ELYTRA)`'s
+   durability**, not a number copied into a test. `FlightComputerMath
+   .elytraHealthPercent(int, int)` was extracted from
+   `FlightComputer.computeElytraHealth` (which now delegates to it) so this is
+   drivable without a live player.
+
+Verified green on **all 5 Fabric cells** (1.18.2 → 26.2), 6 tests each, parsed
+from `versions/*/build/test-results/test/`. Bootstrap costs ~4–5.5s per cell.
+
+**26.x needs one extra bootstrap step.** Through 1.21.4 an item's data
+components were baked into the `Item` at construction; in 26.x they are built
+from loaded registry data and bound onto each `Holder.Reference` afterwards, so
+constructing any `ItemStack` before that throws `Components not bound yet`. The
+`@BeforeAll` therefore runs `BuiltInRegistries.DATA_COMPONENT_INITIALIZERS
+.build(VanillaRegistries.createLookup())` and applies the result, guarded
+`//? if >=26.1`. Full detail and the `javap` evidence are in `PLAN.md`.
+
+Fabric cells only (`//? if fabric` wraps the whole file). NeoForge's equivalent
+bootstrap is `junit-fml`, whose supported harness is ModDevGradle-only and so
+unavailable under Architectury Loom — see the exclusion comment in
+`build.gradle.kts`.
+
+```bash
+./gradlew test --tests "*LoadedGameTest"
+```
+
 ## Version matrix
 
 See `PLAN.md` for the live status checklist. Target matrix as specified by the

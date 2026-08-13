@@ -651,3 +651,84 @@ Read from the JaCoCo XML report, not from whether the gate passes:
 
 A passing `check` means "no regression inside the analysed surface" — it does not
 mean the whole codebase is tested to that percentage.
+
+## Tier 1: loaded-game testing (added 2026-08-13)
+
+`src/test/java/net/torocraft/flighthud/LoadedGameTest.java` runs against a real,
+bootstrapped Minecraft and a real Fabric loader, via
+`net.fabricmc:fabric-loader-junit` (added to `build.gradle.kts` under
+`if (mod.isFabric)`). This is a different *kind* of test from everything above:
+the rest of the suite is headless arithmetic and file I/O, deliberately chosen
+because it needs no game. This one deliberately needs the game.
+
+Six tests, all Fabric cells:
+
+1. `gameDataIsActuallyLoaded` — a guard on the harness itself. If the bootstrap
+   ever silently no-ops, every other assertion in the class would pass
+   vacuously; this one wouldn't.
+2. `modIsDiscoveredByARealFabricLoader` — the *processed* `fabric.mod.json`
+   (Stonecraft templating already applied) is on the test runtime classpath, so
+   a real loader discovers this mod exactly as the game would.
+3. `declaredDependencyRangesAreSatisfiableInThisCell` — the genuine drift hazard
+   of a Stonecutter matrix. A cell can compile and package flawlessly while
+   declaring a `minecraft` range that excludes the very version it was built
+   for, producing a jar that ships and then refuses to load. The loader resolves
+   every `DEPENDS` range against the actually-loaded versions, per cell.
+4. `headingMatchesTheGamesOwnCompass` — pins `FlightComputerMath.toHeading`
+   to vanilla's own `Direction.fromYRot`, so a version that changed the
+   yaw-to-facing convention fails the build instead of silently pointing the
+   HUD the wrong way.
+5. `headingWrapAgreesWithVanillaDegreeWrapping` — sweeps −1080°→1080° and
+   requires `wrapHeading` and `Mth.wrapDegrees` to always describe the same
+   angle despite normalising into different windows.
+6. `elytraHealthReadoutTracksRealElytraDurability` — reads max damage off a real
+   `ItemStack(Items.ELYTRA)` rather than a number copied into a test. This
+   required extracting `FlightComputerMath.elytraHealthPercent(int, int)` out of
+   `FlightComputer.computeElytraHealth`, which now delegates to it.
+
+**Verified green on all 5 Fabric cells** (1.18.2, 1.19.4, 1.20.1, 1.21.4, 26.2),
+6 tests each, read from `versions/*/build/test-results/test/`, not from the build
+task's exit status. Bootstrap costs ~4–5.5s per cell.
+
+### The 26.x data-component binding step
+
+The elytra test failed on `26.2-fabric` alone, with
+`NullPointerException: Components not bound yet` from `Holder.Reference.components()`
+inside the `ItemStack` constructor. This is not test plumbing — it is a real
+change in when item data becomes readable:
+
+- Through 1.21.4, an item's data components were baked into the `Item` instance
+  at construction, so `Bootstrap.bootStrap()` alone was enough to read one.
+- In 26.x they are produced by `BuiltInRegistries.DATA_COMPONENT_INITIALIZERS`
+  from a `HolderLookup.Provider` — i.e. **from loaded registry data** — and bound
+  onto each `Holder.Reference` afterwards. Confirmed by `javap` against the real
+  `minecraft-merged-deobf-26.2.jar`: the only callers of
+  `Holder.Reference.bindComponents` are `DataComponentInitializers$BakedEntry`,
+  driven from `ReloadableServerResources` (server) and `RegistryDataCollector`
+  (client).
+
+`@BeforeAll` therefore runs, guarded `>=26.1`:
+
+```java
+BuiltInRegistries.DATA_COMPONENT_INITIALIZERS
+        .build(VanillaRegistries.createLookup())
+        .forEach(DataComponentInitializers.PendingComponents::apply);
+```
+
+`VanillaRegistries.createLookup()` is the built-in-only equivalent of the
+provider the server builds during a resource reload. The guard sits at 26.1
+because that is where this matrix's 26.x line starts; there is no cell between
+1.21.4 and 26.2 to narrow it further, and 1.21.4 demonstrably does not need it.
+
+### What Tier 1 does *not* cover
+
+A loaded *game*, not a loaded *client*: there is no window, no render pass, and
+no player entity. Nothing in `HudRenderer`, `PlatformCanvas`, `HudHooks`, or
+`components/**` is exercised — those need a real client, which is Tier 3
+(Fabric client gametest + xvfb), still open.
+
+NeoForge cells have no equivalent. `junit-fml` is NeoForge's own loaded-test
+bootstrap, but its supported harness (`neoForge { unitTest { … } }`, the
+`testframework` artifact, `EphemeralTestServerProvider`, `runGameTestServer`) is
+ModDevGradle-only, and this repo builds on Architectury Loom via Stonecraft. See
+the junit-fml exclusion comment in `build.gradle.kts`.

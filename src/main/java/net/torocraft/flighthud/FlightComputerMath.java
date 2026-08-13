@@ -98,4 +98,19 @@ public final class FlightComputerMath {
     }
     return Math.max(0f, altitude - groundLevel);
   }
+
+  /**
+   * Remaining elytra durability as a percentage, from an item stack's raw
+   * max-damage and current-damage values.
+   *
+   * <p>Extracted from {@code FlightComputer.computeElytraHealth} so it can be
+   * exercised against a <em>real</em> {@code ItemStack(Items.ELYTRA)} in
+   * LoadedGameTest: elytra durability is game data, and it has changed
+   * representation before (item field pre-1.20.5, data component after), so
+   * the readout is worth pinning to the real item rather than to a constant
+   * copied into a test.
+   */
+  public static float elytraHealthPercent(int maxDamage, int damageValue) {
+    return ((float) maxDamage - (float) damageValue) / (float) maxDamage * 100f;
+  }
 }

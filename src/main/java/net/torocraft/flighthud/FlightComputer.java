@@ -44,8 +44,7 @@ public class FlightComputer {
   private Float computeElytraHealth(Minecraft client) {
     ItemStack stack = client.player.getItemBySlot(EquipmentSlot.CHEST);
     if (stack != null && stack.getItem() == Items.ELYTRA) {
-      float remain = ((float) stack.getMaxDamage() - (float) stack.getDamageValue()) / (float) stack.getMaxDamage();
-      return remain * 100f;
+      return FlightComputerMath.elytraHealthPercent(stack.getMaxDamage(), stack.getDamageValue());
     }
     return null;
   }
