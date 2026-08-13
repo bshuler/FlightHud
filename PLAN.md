@@ -638,3 +638,16 @@ Final verification: `./gradlew ":1.20.1-fabric:check"` — `BUILD SUCCESSFUL`,
   watcher-thread patterns are in the Phase 5 section above. Re-verified 3x per
   subproject after the fix; full `chiseledBuild` regression sweep re-confirmed
   all 10 cells still green afterward.
+
+## Coverage in context (measured 2026-08-13)
+
+Read from the JaCoCo XML report, not from whether the gate passes:
+
+- **Analysed surface:** 9 of 25 compiled classes (36%).
+- **Line coverage of that surface:** 100.0% (173 lines analysed).
+- Classes outside that surface are excluded by the documented exclusion list. They
+  are not covered by any test and are not runtime-verified.
+  Measured from `FlightHud/versions/1.18.2-fabric/build/reports/jacoco/test/jacocoTestReport.xml`.
+
+A passing `check` means "no regression inside the analysed surface" — it does not
+mean the whole codebase is tested to that percentage.
