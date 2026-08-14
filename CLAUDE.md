@@ -320,6 +320,60 @@ unavailable under Architectury Loom — see the exclusion comment in
 ./gradlew test --tests "*LoadedGameTest"
 ```
 
+Note the coverage coupling: `FlightComputerMath.elytraHealthPercent` was
+extracted for test 5 above, and because `LoadedGameTest` doesn't compile on
+Forge cells, it must also be covered from `FlightComputerMathTest` or the
+Forge cells' 100% JaCoCo gate fails. Keep both.
+
+### Client gametests (Tier 3)
+
+`src/gametest/java/net/torocraft/flighthud/gametest/FlightHudClientGameTest.java`
+runs a **real Minecraft client** — real window, real GL context, real render
+thread, real world — and asserts that the HUD actually draws. This is the only
+tier that can catch the failure this mod is most prone to: `HudHooks.register()`
+binding to a hook the running Minecraft version doesn't fire, which compiles,
+packages, loads, and passes every other test while rendering nothing (exactly
+what 26.x did — see hotspot #1).
+
+```bash
+./gradlew :26.2-fabric:runClientGameTest      # or :1.21.4-fabric:
+```
+
+Four assertions: the client reaches the title screen; the loader really has
+`flighthud` loaded (harness guard); `HudComponent.CONFIG` goes null → non-null
+after 40 in-world ticks, which can only happen inside `HudRenderer.render(...)`;
+and no `net.torocraft.flighthud` stack trace appears on stderr while the world
+is open (necessary because `HudRenderer.render` swallows exceptions into
+`printStackTrace()`, so a broken component is otherwise a silent pass). Title
+and in-world screenshots land in
+`versions/<cell>/build/run/clientGameTest/screenshots/`.
+
+**Only `1.21.4-fabric` and `26.2-fabric`.** `fabric-client-gametest-api-v1`
+doesn't exist for the older bundles; the gate in `build.gradle.kts` is
+`clientGameTestSupported`, and on other cells no gametest source set, run config
+or `check` hook is created. The two cells ship v4.1.1 and v6.0.0 respectively
+and share one un-branched file that uses only their common API — in particular
+avoiding `TestSingleplayerContext.getClientWorld()` (v4-only) and
+`getConnection()` (v6-only). Stonecutter *does* preprocess this source set, so
+`//? if` markers are available if that ever stops being enough.
+
+**Do not remove the `afterEvaluate` block that fixes the `clientGameTest` run
+config.** Stonecraft's `loom.runs.all { }` hook catches this run config and (a)
+adds a second `--username`, which kills the launch outright, and (b) repoints
+`runDir` at the repo-root `run/` — the developer's own dev directory — while
+Loom's `clearRunDirectory` defaults to true and a `Delete` task runs over it.
+Both are fixed there, for the `clientGameTest` config only. Full detail, and the
+negative-control result proving the assertions aren't vacuous, in PLAN.md
+"Tier 3".
+
+### CI
+
+`.github/workflows/build.yml`: a `build` job running `./gradlew chiseledBuild`
+(all 10 cells plus every cell's `check`), and a `client-gametest` matrix job
+running the two supported cells under `xvfb-run` with software OpenGL. JDK 21
+is the only `setup-java`; 26.x's Java 25 comes from the foojay toolchain
+resolver, and adding a second `setup-java` would defeat that.
+
 ## Version matrix
 
 See `PLAN.md` for the live status checklist. Target matrix as specified by the

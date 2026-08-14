@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "flighthud-gametest",
+  "version": "1.0.0",
+  "name": "Flight HUD Client Game Test",
+  "description": "Tier 3 client gametest for Flight HUD. Never shipped: this source set is not part of any published jar.",
+  "license": "GPL3",
+  "environment": "client",
+  "entrypoints": {
+    "fabric-client-gametest": [
+      "net.torocraft.flighthud.gametest.FlightHudClientGameTest"
+    ]
+  },
+  "depends": {
+    "flighthud": "*"
+  }
+}

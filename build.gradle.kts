@@ -66,6 +66,135 @@ dependencies {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Tier 3 "real client" testing: Fabric client gametests.
+//
+// Tier 1 (fabric-loader-junit, above) stands a loader and a bootstrapped
+// Minecraft up inside a JUnit worker, but there is no window, no render
+// thread, and no game loop - so it cannot answer the one question that
+// matters most for a HUD mod: does the render hook this cell registers
+// actually fire, in a real running client, against that MC version's real
+// rendering architecture? Tier 3 launches an actual Minecraft client,
+// creates a world, and asserts against it.
+//
+// Gated `>=1.21.4` because fabric-client-gametest-api-v1 does not exist in
+// the Fabric API bundles for 1.20.1/1.19.4/1.18.2 (checked against the real
+// fabric-api POMs on maven.fabricmc.net, not assumed): the module first
+// appears around fabric-api 0.106 / MC 1.21.2. The two supported cells ship
+// v4.1.1 (1.21.4) and v6.0.0 (26.2); the test source deliberately uses only
+// the API surface those two versions have in common, verified by javap
+// against both jars, so one un-preprocessed source file compiles on both.
+val clientGameTestSupported = mod.isFabric &&
+    stonecutter.eval(stonecutter.current.version, ">=1.21.4")
+
+if (clientGameTestSupported) {
+    // Loom (Architectury 1.14.476/1.17.491 here - both carry the same
+    // FabricApiExtension API, confirmed via javap) is not applied through this
+    // script's `plugins {}` block, so there is no generated `fabricApi { }`
+    // accessor; configure the extension by type instead.
+    extensions.configure<net.fabricmc.loom.api.fabricapi.FabricApiExtension>("fabricApi") {
+        configureTests {
+            createSourceSet.set(true)
+            modId.set("flighthud-gametest")
+            // enableGameTests wires `check` to dependsOn(runGameTest), i.e. it
+            // drags a real *server* launch into every `./gradlew check`. This
+            // mod is client-only and has no server gametests, so it stays off.
+            enableGameTests.set(false)
+            enableClientGameTests.set(true)
+            // eula is deliberately left at its default (false). Loom's
+            // acceptGameTestEula task writes `eula=true` into the run
+            // directory on your behalf; that is Mojang's EULA, so it is not
+            // accepted automatically here. The client gametest run does not
+            // need it (only the dedicated-server variant does) - if a run ever
+            // fails asking for it, accept it deliberately rather than by
+            // flipping this flag in passing.
+        }
+    }
+
+    // Loom's createSourceSet leaves the new source set on Gradle's default
+    // convention, and Stonecutter picks it up from there automatically: the
+    // `gametest` source set ends up with srcDirs
+    // [versions/<cell>/src/gametest/java, versions/<cell>/build/generated/
+    // stonecutter/gametest/java] and gets its own stonecutterPrepare/Generate/
+    // MergeGametest tasks, exactly like `main` and `test` (verified by running
+    // stonecutterGenerateGametest and reading the generated tree, not assumed).
+    // So the shared root `src/gametest` tree IS run through the preprocessor and
+    // `//? if` markers work in it. Nothing to override here.
+    //
+    // The client gametest still avoids version branching where it can, because
+    // the 1.21.4 and 26.2 cells ship different major versions of the
+    // client-gametest API (v4.1.1 vs v6.0.0) and the subset they share - checked
+    // with javap against both jars - covers everything this test needs.
+
+    // Loom's `mods` container starts empty, and configureTests' createSourceSet
+    // adds an entry for the gametest mod. That single entry would otherwise be
+    // the *only* classpath group, leaving the main mod's classes and resources
+    // ungrouped in the dev run. Register it explicitly so `flighthud` is one mod
+    // again; the test asserts FabricLoader can see it, so a regression here fails
+    // loudly rather than silently running the game without the mod under test.
+    extensions.configure<net.fabricmc.loom.api.LoomGradleExtensionAPI>("loom") {
+        mods.create(mod.prop("id", "flighthud")).sourceSet(sourceSets["main"])
+    }
+
+    // Two plugins both want to name the player, and Minecraft's argument parser
+    // (joptsimple) treats `username` as a single-valued option, so the run dies
+    // with MultipleArgumentsForOptionException before the client even starts:
+    //
+    //   PROBE run=clientGameTest args=[--username, Player0, --username=developer]
+    //
+    // Stonecraft appends `--username=developer` from a `loom.runs.all { }` block
+    // to every run config whose environment is `client` (Stonecraft's Loom.kt,
+    // read from its bytecode), and that `all` hook catches `clientGameTest` too
+    // because Loom creates it later. Loom's own configureTests passes
+    // `--username Player0` (GameTestSettings.getUsername()'s convention).
+    //
+    // Drop Stonecraft's, keep Loom's: the gametest run is not a human's dev
+    // session, and the client-gametest screenshot comparisons key off the
+    // harness's own default username. Only the `clientGameTest` config is
+    // touched, so `runClient` still logs in as `developer`. This runs in
+    // afterEvaluate because Loom creates the run config while this script's
+    // body is still executing, and Stonecraft's `all` action fires at creation.
+    //
+    // That same `runs.all { }` block also calls setRunDir on every run config,
+    // which overwrites the `build/run/clientGameTest` that Loom had just set and
+    // repoints the gametest at `../../run` - the repo-root run directory a human
+    // uses for `runClient`. That is not merely untidy: GameTestSettings'
+    // clearRunDirectory conventions to `true`, and Loom registers a
+    // `deleteGameTestRunDir` Delete task over `runConfig.getRunDir()`, so
+    // launching the gametest would wipe the developer's own dev world, options
+    // and screenshots. Put it back where Loom wanted it, which is also per-cell
+    // (versions/<cell>/build/run/clientGameTest) so 1.21.4 and 26.2 do not share
+    // a run directory or overwrite each other's screenshots. The Delete task
+    // reads getRunDir() lazily when it is realized, so correcting it here is
+    // enough to redirect the deletion too.
+    afterEvaluate {
+        extensions.configure<net.fabricmc.loom.api.LoomGradleExtensionAPI>("loom") {
+            runs.named("clientGameTest") {
+                programArgs.removeAll { it.startsWith("--username=") }
+                runDir = "build/run/clientGameTest"
+            }
+        }
+    }
+
+    // No dependency declaration for fabric-client-gametest-api-v1 here on
+    // purpose. Loom's configureTests adds none of its own (checked in
+    // FabricApiTesting's bytecode), but Stonecraft already puts the whole
+    // `fabric-api` bundle artifact on the compile classpath - modApi on 1.21.4,
+    // plain api on 26.2, which is unobfuscated and needs no remapping - and that
+    // bundle depends on every module including this one. Both cells resolve it
+    // transitively (1.21.4 -> 4.1.1+6816ccd404, 26.2 -> 6.0.0+515ac5339e), and
+    // the gametest configurations extend main's, so it is already there.
+    // Declaring it again would just pin a second, possibly conflicting version.
+
+    // Nothing in the normal build graph compiles a `gametest` source set, so a
+    // compile error in the client gametest would sit undetected until someone
+    // launched the game. Compiling it is cheap and needs no display; make
+    // `check` do it. Running it is still opt-in (see runClientGameTest).
+    tasks.named("check") {
+        dependsOn(tasks.named("compileGametestJava"))
+    }
+}
+
 // NeoForge's transitive net.neoforged.fancymodloader:junit-fml (<=9.0.18) auto-registers a
 // LauncherSessionListener that looks up a run-config file "mainargs.txt" via a relative path
 // that doesn't resolve under Gradle's test-worker working directory, failing `test` at

@@ -732,3 +732,168 @@ bootstrap, but its supported harness (`neoForge { unitTest { … } }`, the
 `testframework` artifact, `EphemeralTestServerProvider`, `runGameTestServer`) is
 ModDevGradle-only, and this repo builds on Architectury Loom via Stonecraft. See
 the junit-fml exclusion comment in `build.gradle.kts`.
+
+## Tier 3: client gametest — the mod in a real Minecraft client (added 2026-08-13)
+
+`src/gametest/java/net/torocraft/flighthud/gametest/FlightHudClientGameTest.java`
+launches an actual Minecraft **client** — real window, real GL context, real
+render thread, real world — with this mod loaded, and asserts against what it
+does. It closes the one hole Tiers 0–1 structurally cannot reach, and it is
+the hole this mod is most likely to fall into.
+
+**Why this mod specifically needs it.** The unit suite proves the maths; Tier 1
+proves a real loader discovers the mod and that its `fabric.mod.json` ranges
+resolve. Neither renders a frame. So neither can tell you whether
+`HudHooks.register()` picked the *right* hook for the Minecraft version it was
+compiled against — and that is exactly what broke on 26.x, where `Gui` lost the
+`render(...)` method the mod used to mixin into (see CLAUDE.md hotspot #1). A
+FlightHud whose HUD silently never draws still compiles, still packages, still
+loads, and still passes every other test in this repo. Tier 3 fails.
+
+### What it asserts
+
+1. The client reaches the title screen at all — the mod's client entrypoint ran
+   without killing startup.
+2. `FabricLoader.isModLoaded("flighthud")` — a guard on the harness. Without it
+   everything below could pass with the mod jar absent from the classpath.
+3. **The render hook actually fires in-world.** `HudComponent.CONFIG` is set to
+   null, a singleplayer world is opened, 40 ticks pass, and `CONFIG` must be
+   non-null. It can only have become non-null inside `HudRenderer.render(...)`,
+   whose first statement (`setupConfig`) nulls and reassigns it every frame.
+4. **The full component chain draws without throwing.** This needs its own
+   mechanism, because `HudRenderer.render(...)` wraps the whole draw in
+   `catch (Exception e) { e.printStackTrace(); }` — a broken component prints a
+   stack trace and the game carries on looking fine. Stderr is tee'd for the
+   duration of the world and any `net.torocraft.flighthud` frame fails the test.
+
+The shipped default display mode when *not* flying is `NONE`, and the test does
+not fly (that needs an elytra, altitude and sustained input), so it forces
+`displayModeWhenNotFlying = FULL` for the duration — which drives all seven
+components through a real draw — and restores it in a `finally`.
+
+Two screenshots (`flighthud-title-screen`, `flighthud-in-world`) are written to
+`versions/<cell>/build/run/clientGameTest/screenshots/` on every run.
+
+### Coverage: 1.21.4-fabric and 26.2-fabric only
+
+`fabric-client-gametest-api-v1` first appears around fabric-api 0.106 / MC
+1.21.2, so it does not exist for the 1.20.1, 1.19.4 or 1.18.2 bundles. The
+`build.gradle.kts` gate is `mod.isFabric && stonecutter.eval(current, ">=1.21.4")`;
+on every other cell no gametest source set, run config or `check` dependency is
+created at all. NeoForge/Forge have no client-gametest equivalent reachable
+under Architectury Loom (same ModDevGradle blocker as Tier 1's `junit-fml`).
+
+The two supported cells ship **different major versions of the API** — 1.21.4
+gets **v4.1.1+6816ccd404**, 26.2 gets **v6.0.0+515ac5339e** — and share one
+un-branched source file. That works because only the intersection of the two
+API surfaces is used, established by `javap` against both jars and then
+confirmed by compiling the same file on both cells. The one real difference is
+`TestSingleplayerContext`: v4 has `getClientWorld()`, v6 has `getConnection()`;
+both are avoided in favour of `getWorldSave()`/`getServer()`/`close()`, which
+are common. Stonecutter *does* preprocess this source set (Loom's
+`createSourceSet` leaves `gametest` on Gradle's default convention and
+`stonecutterGenerateGametest` picks it up from there — verified by running the
+task and reading the generated tree), so `//? if` markers are available here if
+a future divergence needs them.
+
+### Verified, and verified to fail
+
+Both cells were run and their **console transcripts read**, not just their exit
+status:
+
+- `:26.2-fabric:runClientGameTest` — BUILD SUCCESSFUL, `Player0` logged in at
+  (0.5, −60.0, 0.5), clean shutdown.
+- `:1.21.4-fabric:runClientGameTest` — BUILD SUCCESSFUL, 56 mods loaded
+  including `flighthud`, `flighthud-gametest` and
+  `fabric-client-gametest-api-v1 4.1.1`, `Player0` logged in at (8.5, −60.0, 0.5).
+
+Both in-world screenshots were then **looked at**, and show the HUD drawing:
+heading tape, pitch ladder, altitude, airspeed, elytra readout, flight-path
+indicator — on 26.2 that means through the new `GuiRenderState` architecture.
+
+**Negative control.** A green run only proves the assertion can pass. Flipping
+the forced display mode from `FULL` to `NONE` — which stops `HudRenderer` from
+assigning `CONFIG` while changing nothing else — produced `BUILD FAILED in 24s`,
+exit 1, and the AssertionError text propagating out through
+`net.fabricmc.loader.impl.FormattedException`. So a failing client gametest
+really does fail the build, and assertion 3 is not vacuous. The test file was
+restored byte-for-byte afterwards.
+
+### Two Stonecraft/Loom conflicts, one of them destructive
+
+Stonecraft configures `loom.runs.all { }` (its `Loom.kt`, read from bytecode),
+and because that is an `all` hook it also catches the `clientGameTest` run
+config that Loom creates later. Two collisions result, both fixed in an
+`afterEvaluate` block in `build.gradle.kts` that touches **only** the
+`clientGameTest` config:
+
+1. **`--username` twice → the run could not start.** Stonecraft appends
+   `--username=developer` to every `client`-environment run; Loom's
+   `configureTests` passes `--username Player0` (the `GameTestSettings`
+   convention). Minecraft's joptsimple parser treats `username` as
+   single-valued, so the client died with
+   `MultipleArgumentsForOptionException` before starting. Stonecraft's copy is
+   dropped and Loom's kept — the gametest is not a human's dev session, and the
+   API's screenshot comparisons key off its own default username. `runClient`
+   still logs in as `developer`.
+2. **The gametest was pointed at the developer's own run directory.** The same
+   hook calls `setRunDir` on every config, overwriting the
+   `build/run/clientGameTest` Loom had just set with the repo-root `../../run`.
+   That is not cosmetic: `GameTestSettings.getClearRunDirectory()` conventions
+   to `true`, and Loom registers a `deleteGameTestRunDir` `Delete` task over
+   `runConfig.getRunDir()` — so launching the gametest would have **wiped the
+   developer's dev world, options and screenshots**. The run dir is put back to
+   `build/run/clientGameTest`, which is also per-cell, so 1.21.4 and 26.2 do not
+   share a directory or overwrite each other's screenshots. The `Delete` task
+   reads `getRunDir()` lazily at realization, so correcting it here redirects
+   the deletion too.
+
+Also note the main mod must be re-registered with `loom.mods` after
+`createSourceSet(true)`: creating the gametest source set displaces it, leaving
+`loom.mods` containing only `flighthud-gametest`.
+
+### Stonecraft's own gametest support was evaluated and not used
+
+Stonecraft ships `configureClientGameTests`/`configureServerGameTests`, creating
+`gameTestClient`/`gameTestServer` run configs and `-Dfabric-api.gametest`
+properties with JUnit report locations. It is the **server**-style
+`fabric-api.gametest` runner: it drives structure-block tests in a loaded world.
+It cannot wait on a title screen, cannot take screenshots, and cannot assert on
+client-side HUD rendering — which is the entire point here. Rejected on
+capability, not on preference. `enableGameTests` is likewise left **false**;
+turning it on would wire `check` to a real server launch.
+
+### CI
+
+`.github/workflows/build.yml` (new — this repo had no CI at all before) has two
+jobs:
+
+- `build` — `./gradlew chiseledBuild` on ubuntu-latest, which builds all 10
+  cells *and* runs each cell's `check` (unit suite + Tier 1 + the JaCoCo gate).
+  JDK 21 is set up as the floor; 26.x's Java 25 is auto-provisioned by the
+  foojay resolver, so there is deliberately no second `setup-java`.
+- `client-gametest` — a matrix over `1.21.4-fabric` and `26.2-fabric`, each run
+  under `xvfb-run` with Mesa's software rasteriser (`LIBGL_ALWAYS_SOFTWARE=1`)
+  because the runner has no display and no GPU. Screenshots and logs are
+  uploaded on success *and* failure — the failure screenshot is the more useful
+  one.
+
+### Coverage regression found while landing this (fixed)
+
+`chiseledBuild` failed on `1.18.2-forge` and `1.19.4-forge` with
+`lines covered ratio is 0.99`. Cause: Tier 1 extracted
+`FlightComputerMath.elytraHealthPercent(int, int)` and covered it only from
+`LoadedGameTest`, which is `//? if fabric`-gated — so on the three Forge cells
+that method was the single uncovered line in the bundle. (1.20.1-forge's report
+shows the same miss; its verification task happened to be up-to-date from an
+earlier run, which is a reminder that a green `chiseledBuild` on a warm cache is
+weaker evidence than a cold one.) Fixed by adding three arithmetic cases to
+`FlightComputerMathTest`, which compiles on every cell. The
+agreement-with-a-real-`ItemStack` claim stays in `LoadedGameTest` where it
+belongs.
+
+### Tier 4 (NeoForge testframework) remains blocked
+
+Same structural reason as Tier 1's NeoForge gap: NeoForge's `testframework` /
+`runGameTestServer` harness is ModDevGradle-only and this repo builds on
+Architectury Loom via Stonecraft. Documented as blocked, not attempted.

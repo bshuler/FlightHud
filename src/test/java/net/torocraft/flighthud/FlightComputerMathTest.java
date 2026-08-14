@@ -141,4 +141,27 @@ class FlightComputerMathTest {
   void computeDistanceFromGround_clampedToZeroWhenBelowGroundLevel() {
     assertEquals(0.0f, FlightComputerMath.computeDistanceFromGround(50.0f, 64), DELTA);
   }
+
+  // elytraHealthPercent is also asserted in LoadedGameTest against a real
+  // ItemStack(Items.ELYTRA)'s durability, which is the more meaningful check --
+  // but that test is Fabric-only (`//? if fabric` wraps the whole file), so on
+  // the Forge cells it is not compiled and this method would otherwise be the
+  // one uncovered line in the whole bundle, failing the 100% coverage gate.
+  // These cases carry the arithmetic on every cell; LoadedGameTest carries the
+  // agreement-with-vanilla claim on the cells that can make it.
+
+  @Test
+  void elytraHealthPercent_fullWhenUndamaged() {
+    assertEquals(100f, FlightComputerMath.elytraHealthPercent(432, 0), DELTA);
+  }
+
+  @Test
+  void elytraHealthPercent_halfWhenHalfDamaged() {
+    assertEquals(50f, FlightComputerMath.elytraHealthPercent(432, 216), DELTA);
+  }
+
+  @Test
+  void elytraHealthPercent_zeroWhenFullyDamaged() {
+    assertEquals(0f, FlightComputerMath.elytraHealthPercent(432, 432), DELTA);
+  }
 }

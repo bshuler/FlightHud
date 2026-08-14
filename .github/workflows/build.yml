@@ -1,0 +1,121 @@
+name: Build
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build matrix + unit/loaded tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      # Java 21 is the floor. Cells whose Minecraft needs a newer JDK (26.x
+      # needs 25) auto-provision it through the foojay resolver declared in
+      # settings.gradle.kts -- see CLAUDE.md "Environment notes". Do not add a
+      # second setup-java step for 25; that would defeat the toolchain.
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # chiseledBuild builds every cell AND runs each cell's `check`, which is
+      # the unit suite (JUnit 5), the Tier 1 loaded-game test on the Fabric
+      # cells, and the JaCoCo 100%-line gate.
+      - name: Build all versions and loaders
+        run: ./gradlew chiseledBuild
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ github.sha }}
+          path: |
+            versions/*/build/reports/tests/**
+            versions/*/build/test-results/**
+            versions/*/build/reports/jacoco/**
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Upload mod jars
+        uses: actions/upload-artifact@v4
+        with:
+          name: flighthud-jars-${{ github.sha }}
+          path: |
+            versions/*/build/libs/*.jar
+            !versions/*/build/libs/*-sources.jar
+          retention-days: 14
+
+  client-gametest:
+    name: Tier 3 client gametest (headless)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Only the cells whose Fabric API bundle ships
+        # fabric-client-gametest-api-v1. It first appears around fabric-api
+        # 0.106 / MC 1.21.2, so 1.20.1, 1.19.4 and 1.18.2 have no such run
+        # config at all -- see build.gradle.kts, `clientGameTestSupported`.
+        cell: ['1.21.4-fabric', '26.2-fabric']
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # A real Minecraft client really launches here: real window, real GL
+      # context, real render thread. The runner has no display and no GPU, so
+      # it needs a virtual X server plus Mesa's software rasteriser.
+      - name: Install virtual display and software OpenGL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            xvfb libgl1 libgl1-mesa-dri libglx-mesa0 mesa-vulkan-drivers \
+            libxi6 libxxf86vm1 libxrandr2 libxcursor1 libxinerama1 libxext6
+
+      - name: Run client gametest (${{ matrix.cell }})
+        env:
+          # Force llvmpipe. Without this LWJGL can pick up a partial hardware
+          # GL stack on the runner and fail at context creation rather than
+          # falling back.
+          LIBGL_ALWAYS_SOFTWARE: 'true'
+          MESA_GL_VERSION_OVERRIDE: '3.3'
+        run: |
+          xvfb-run -a --server-args="-screen 0 1920x1080x24" \
+            ./gradlew :${{ matrix.cell }}:runClientGameTest --stacktrace
+
+      # The test writes a title-screen and an in-world screenshot on every run.
+      # They are the evidence that the HUD actually drew, so keep them whether
+      # the run passed or failed -- a failure screenshot is the more useful one.
+      - name: Upload gametest screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-gametest-${{ matrix.cell }}-${{ github.sha }}
+          path: |
+            versions/${{ matrix.cell }}/build/run/clientGameTest/screenshots/**
+            versions/${{ matrix.cell }}/build/run/clientGameTest/logs/**
+          retention-days: 14
+          if-no-files-found: warn

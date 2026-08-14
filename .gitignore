@@ -1,4 +1,6 @@
-.github
+# NOTE: `.github` was ignored here from upstream's very first commit, which is
+# why this fork had no CI at all until 2026-08-13 - any workflow file added was
+# silently untracked. Do not re-add it.
 .history
 
 # gradle
