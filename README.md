@@ -35,17 +35,46 @@ __Flight HUD__ is a client side Fabric Minecraft Mod that adds a flight style HU
 ## Supported versions and loaders
 
 This mod is built with [Stonecutter](https://stonecutter.kikugie.dev/) +
-[Stonecraft](https://stonecraft.meza.gg/) across the following targets. Every
-cell is a real build target, not aspirational — see `PLAN.md` for live status
-and `CLAUDE.md` for architecture/porting notes.
+[Stonecraft](https://stonecraft.meza.gg/) from a single codebase. All ten
+cells build and pass their test suites — see `PLAN.md` for per-cell notes
+and `CLAUDE.md` for architecture/porting detail.
 
 | MC version | Fabric | NeoForge | Forge |
 |---|---|---|---|
-| newest stable | target | target | n/a — not targeted for the newest two versions (program scope) |
-| 1.21.4 | target | target | n/a — not targeted for the newest two versions (program scope) |
-| 1.20.1 | target | n/a — NeoForge doesn't exist before 1.20.2 | target |
-| 1.19.4 | target | n/a — NeoForge doesn't exist before 1.20.2 | target |
-| 1.18.2 | target | n/a — NeoForge doesn't exist before 1.20.2 | target |
+| 26.2 | ✅ | ✅ | — (NeoForge only, post-split) |
+| 1.21.4 | ✅ | ✅ | — |
+| 1.20.1 | ✅ | — (NeoForge doesn't exist before 1.20.2) | ✅ |
+| 1.19.4 | ✅ | — | ✅ |
+| 1.18.2 | ✅ | — | ✅ |
 
 Quilt users: install any `*-fabric` jar for your Minecraft version — no
 Quilt-specific build exists or is needed.
+
+## Testing
+
+Three tiers, all run by CI ([build.yml](.github/workflows/build.yml)):
+
+1. **Unit tests + coverage gate** — JUnit 5 over the HUD's pure math
+   (pitch/heading/altitude scales, layout), with a JaCoCo **100%
+   line-coverage gate** enforced by `./gradlew check`. Runs in **every one
+   of the ten version×loader builds**.
+2. **Loaded-game tests** (`fabric-loader-junit`) — a real bootstrapped
+   Minecraft and a real Fabric loader validate the processed mod metadata,
+   dependency ranges, and agreement with live game values, on every Fabric
+   cell.
+3. **Client gametests** (`fabric-client-gametest-api-v1`, 1.21.4 + 26.2) —
+   a **real Minecraft client** flies a real Elytra and the test asserts on
+   the actual screen pixels the HUD produced. This is the only tier that
+   can see the rendering code at all. CI runs it headless (xvfb + software
+   GL) and uploads the screenshots as artifacts.
+
+Full write-up, including negative controls and the JaCoCo exclusion table,
+is in `PLAN.md` and `CLAUDE.md`.
+
+## Building from source
+
+```bash
+unset JAVA_HOME            # Gradle's toolchain resolver picks per-cell JDKs
+./gradlew chiseledBuild    # build + test every cell
+./gradlew :1.21.4-fabric:build          # one cell
+```
