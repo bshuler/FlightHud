@@ -370,9 +370,14 @@ negative-control result proving the assertions aren't vacuous, in PLAN.md
 
 `.github/workflows/build.yml`: a `build` job running `./gradlew chiseledBuild`
 (all 10 cells plus every cell's `check`), and a `client-gametest` matrix job
-running the two supported cells under `xvfb-run` with software OpenGL. JDK 21
-is the only `setup-java`; 26.x's Java 25 comes from the foojay toolchain
-resolver, and adding a second `setup-java` would defeat that.
+running the two supported cells under `xvfb-run` with software OpenGL. The
+single `setup-java` is **JDK 25, and it must be**: this repo's Stonecraft 1.10
+/ older Loom line checks the Gradle *daemon* JVM when setting up Minecraft
+26.x, so a 21-only runner fails with "Minecraft 26.2 requires Java 25 but
+Gradle is using 21" (the first CI run did exactly that; locally it passed only
+because the daemon ran on a newer system JDK). Foojay still auto-provisions
+the older compile toolchains downward from 25 — one `setup-java`, newest JDK
+any cell needs.
 
 ## Version matrix
 
@@ -466,10 +471,12 @@ removed accordingly (each carries a comment explaining why).
 
 ## Environment notes
 
-- Only JDK installed locally is Temurin 21. Never install another system JDK —
-  rely on Gradle toolchains / the foojay resolver plugin to auto-provision
-  whatever JDK a given node's Minecraft version needs (e.g. Java 25 for 26.x)
-  into `~/.gradle`.
+- Temurin 21 is the only JVM under `/Library/Java`, but the shell's default
+  `java` is a newer Homebrew OpenJDK (26.x) — which is why the Gradle daemon
+  satisfies Minecraft 26.x's Java 25 check locally while a 21-only CI runner
+  does not. Never install another system JDK — rely on Gradle toolchains /
+  the foojay resolver plugin to auto-provision whatever JDK a given node's
+  Minecraft version needs (e.g. Java 25 for 26.x) into `~/.gradle`.
 - Never touch Homebrew for build tooling.
 
 ## Git / fork rules (binding, see Bert's global git standards)

@@ -18,14 +18,19 @@ jobs:
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v4
 
-      # Java 21 is the floor. Cells whose Minecraft needs a newer JDK (26.x
-      # needs 25) auto-provision it through the foojay resolver declared in
-      # settings.gradle.kts -- see CLAUDE.md "Environment notes". Do not add a
-      # second setup-java step for 25; that would defeat the toolchain.
-      - name: Set up JDK 21
+      # The Gradle DAEMON must run on Java 25, not just have 25 available as a
+      # toolchain: this repo's Stonecraft 1.10 / older Loom line checks the
+      # daemon JVM itself when setting up Minecraft 26.x ("Minecraft 26.2
+      # requires Java 25 but Gradle is using 21" -- the first CI run of this
+      # workflow failed exactly there on a JDK 21 daemon, while the same build
+      # passed locally on a newer system JDK). Foojay (settings.gradle.kts)
+      # still provisions the OLDER compile toolchains downward from 25, so one
+      # setup-java step is right; it just has to be the newest JDK any cell
+      # needs, not the floor.
+      - name: Set up JDK 25 (daemon JVM; older toolchains auto-provision)
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
+          java-version: '25'
           distribution: 'temurin'
 
       - name: Setup Gradle
@@ -76,10 +81,11 @@ jobs:
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v4
 
-      - name: Set up JDK 21
+      # Same daemon-JVM requirement as the build job above.
+      - name: Set up JDK 25 (daemon JVM; older toolchains auto-provision)
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
+          java-version: '25'
           distribution: 'temurin'
 
       - name: Setup Gradle
