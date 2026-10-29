@@ -2,7 +2,7 @@
 
 ## Goal
 
-Every Bert mod working and compilable for all modern Minecraft versions and
+Every Human mod working and compilable for all modern Minecraft versions and
 loaders, latest first, then backwards. For FlightHud specifically: convert the
 single-version (1.20.1-fabric) codebase to Stonecutter + `gg.meza.stonecraft`
 (mirroring the `critical-orientation` house template), then port render code
@@ -68,7 +68,7 @@ scope reduction.)
 
 ## Updated requirement (2026-08-10): loader coverage is mandatory
 
-Bert's follow-up instruction, applied on top of the original brief: **every MC
+Human's follow-up instruction, applied on top of the original brief: **every MC
 version target must build for every loader viable on that version** — this is
 not new work, it's a confirmation of what the matrix below already commits to
 (Fabric+NeoForge for 1.20.5+, Fabric+Forge for ≤1.20.4). No loader cell may be
@@ -94,7 +94,7 @@ version — not a feasibility choice, a fact about the loader ecosystem):
 
 ### Forgix — single merged all-loader jar (investigated 2026-08-10)
 
-Bert asked whether the **Forgix** Gradle plugin (`io.github.pacifistmc.forgix`,
+Human asked whether the **Forgix** Gradle plugin (`io.github.pacifistmc.forgix`,
 `PacifistMC/Forgix` on GitHub) can merge each MC version's per-loader jars into
 one combined "works on any loader" jar, and whether it composes with the
 Stonecutter/Stonecraft toolchain.
@@ -514,7 +514,7 @@ Final verification: `./gradlew ":1.20.1-fabric:check"` — `BUILD SUCCESSFUL`,
   `yarn_mappings_neoforge_patch` if that version also has a NeoForge cell) for
   any MC version ≤1.21.11 that needs legacy Yarn mappings instead of the
   Mojmap default; omit `yarn_mappings` entirely for MC ≥26.1 (unobfuscated).
-- 2026-08-10: Bert added a binding requirement update: loader coverage across
+- 2026-08-10: Human added a binding requirement update: loader coverage across
   the matrix is mandatory (not "if feasible"), Quilt compatibility must be
   documented (no separate build target — Quilt loads Fabric jars natively),
   and the Forgix jar-merging plugin must be investigated and wired in if alive

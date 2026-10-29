@@ -479,11 +479,11 @@ removed accordingly (each carries a comment explaining why).
   Minecraft version needs (e.g. Java 25 for 26.x) into `~/.gradle`.
 - Never touch Homebrew for build tooling.
 
-## Git / fork rules (binding, see Bert's global git standards)
+## Git / fork rules (binding, see Human's global git standards)
 
 - `origin` = `bshuler/FlightHud` (push here, freely, straight to `main`).
 - `upstream` = `end-user/FlightHud` (fetch-only, never push).
-- Commit as `Bert Shuler <BertShuler@proton.me>`; never attribute AI in commits,
+- Commit as the repo's configured git identity; never attribute AI in commits,
   PRs, or code comments.
 - Default branch is `main` (this repo started on `master` — see PLAN.md for the
   rename step and its status).
