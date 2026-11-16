@@ -170,8 +170,10 @@ if (clientGameTestSupported) {
     afterEvaluate {
         extensions.configure<net.fabricmc.loom.api.LoomGradleExtensionAPI>("loom") {
             runs.named("clientGameTest") {
-                programArgs.removeAll { it.startsWith("--username=") }
-                runDir = "build/run/clientGameTest"
+                programArguments.set(
+                    programArguments.get().filterNot { it.startsWith("--username=") }
+                )
+                runDirectory.set(layout.buildDirectory.dir("run/clientGameTest"))
             }
         }
     }

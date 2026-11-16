@@ -8,7 +8,9 @@ import net.torocraft.flighthud.config.HudConfig;
 import net.torocraft.flighthud.config.SettingsConfig;
 import net.torocraft.flighthud.config.loader.ConfigFolder;
 import net.torocraft.flighthud.config.loader.ConfigLoader;
+//? if <26.3 {
 import org.lwjgl.glfw.GLFW;
+//?}
 
 //? if fabric {
 import net.fabricmc.api.ClientModInitializer;
@@ -188,8 +190,13 @@ public class FlightHud {
   }
 
   private static void setupKeyCode() {
+    //? if >=26.3 {
+    /*keyBinding = new KeyMapping("key.flighthud.toggleDisplayMode", InputConstants.Type.KEYBOARD,
+        InputConstants.KEY_GRAVE, CATEGORY);
+    *///?} else {
     keyBinding = new KeyMapping("key.flighthud.toggleDisplayMode", InputConstants.Type.KEYSYM,
         GLFW.GLFW_KEY_GRAVE_ACCENT, CATEGORY);
+    //?}
 
     //? if fabric && >=26.1 {
     /*KeyMappingHelper.registerKeyMapping(keyBinding);

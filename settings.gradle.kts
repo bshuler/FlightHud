@@ -12,7 +12,7 @@ pluginManagement {
     }
 }
 plugins {
-    id("gg.meza.stonecraft") version "1.10.+"
+    id("gg.meza.stonecraft") version "1.12.+"
     id("dev.kikugie.stonecutter") version "0.9.+"
     // Auto-provisions JDKs (e.g. Java 25 for MC 26.x) that aren't installed
     // locally, so `./gradlew` doesn't need a system JDK per MC version.
@@ -29,6 +29,7 @@ stonecutter {
         }
 
         // Newest stable + previous major: NeoForge (split from Forge at 1.20.2)
+        mc("26.3", "fabric", "neoforge")
         mc("26.2", "fabric", "neoforge")
         mc("1.21.4", "fabric", "neoforge")
 
