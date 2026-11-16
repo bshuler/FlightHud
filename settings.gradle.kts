@@ -28,12 +28,27 @@ stonecutter {
             for (it in loaders) version("$version-$it", version)
         }
 
-        // Newest stable + previous major: NeoForge (split from Forge at 1.20.2)
+        // Newest stable + 26.x (unobfuscated, official mappings): NeoForge
         mc("26.3", "fabric", "neoforge")
         mc("26.2", "fabric", "neoforge")
-        mc("1.21.4", "fabric", "neoforge")
+        mc("26.1.2", "fabric", "neoforge")
+        mc("26.1.1", "fabric", "neoforge")
+        mc("26.1", "fabric", "neoforge")
 
-        // Legacy versions: Forge (predates the NeoForge split)
+        // 1.21.x + 1.20.6: Fabric + NeoForge
+        mc("1.21.11", "fabric", "neoforge")
+        mc("1.21.10", "fabric", "neoforge")
+        mc("1.21.9", "fabric", "neoforge")
+        mc("1.21.8", "fabric", "neoforge")
+        mc("1.21.7", "fabric", "neoforge")
+        mc("1.21.6", "fabric", "neoforge")
+        mc("1.21.5", "fabric", "neoforge")
+        mc("1.21.4", "fabric", "neoforge")
+        mc("1.21.1", "fabric", "neoforge")
+        mc("1.20.6", "fabric", "neoforge")
+
+        // Legacy versions (<= 1.20.4): Fabric + Forge (predates the NeoForge split)
+        mc("1.20.4", "fabric", "forge")
         mc("1.20.1", "fabric", "forge")
         mc("1.19.4", "fabric", "forge")
         mc("1.18.2", "fabric", "forge")

@@ -153,27 +153,47 @@ public final class PlatformCanvas implements FlightCanvas {
 
   @Override
   public void pushPose() {
+    //? if >=1.21.6 {
+    /*context.pose().pushMatrix();
+    *///?} else {
     context.pose().pushPose();
+    //?}
   }
 
   @Override
   public void popPose() {
+    //? if >=1.21.6 {
+    /*context.pose().popMatrix();
+    *///?} else {
     context.pose().popPose();
+    //?}
   }
 
   @Override
   public void translate(float x, float y) {
+    //? if >=1.21.6 {
+    /*context.pose().translate(x, y);
+    *///?} else {
     context.pose().translate(x, y, 0);
+    //?}
   }
 
   @Override
   public void rotateDegrees(float degrees) {
+    //? if >=1.21.6 {
+    /*context.pose().rotate((float) Math.toRadians(degrees));
+    *///?} else {
     context.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(degrees));
+    //?}
   }
 
   @Override
   public void scale(float x, float y) {
+    //? if >=1.21.6 {
+    /*context.pose().scale(x, y);
+    *///?} else {
     context.pose().scale(x, y, 1);
+    //?}
   }
   //?}
 }

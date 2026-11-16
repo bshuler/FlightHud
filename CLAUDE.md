@@ -369,8 +369,8 @@ negative-control result proving the assertions aren't vacuous, in PLAN.md
 ### CI
 
 `.github/workflows/build.yml`: a `build` job running `./gradlew chiseledBuild`
-(all 10 cells plus every cell's `check`), and a `client-gametest` matrix job
-running the two supported cells under `xvfb-run` with software OpenGL. The
+(all 38 cells plus every cell's `check`), and a `client-gametest` matrix job
+running the representative supported cells (`1.21.4-fabric`, `26.2-fabric`, `26.3-fabric`) under `xvfb-run` with software OpenGL. The
 single `setup-java` is **JDK 25, and it must be**: this repo's Stonecraft 1.10
 / older Loom line checks the Gradle *daemon* JVM when setting up Minecraft
 26.x, so a 21-only runner fails with "Minecraft 26.2 requires Java 25 but
@@ -381,28 +381,28 @@ any cell needs.
 
 ## Version matrix
 
-See `PLAN.md` for the live status checklist. Target matrix as specified by the
-modernization program:
+See `PLAN.md` for the live status checklist. Full 19-version, 38-cell matrix
+per `/Users/bshuler/code/claude-standards/minecraft-mod-standards.md`:
 
 | MC version | Fabric | NeoForge | Forge |
 |---|---|---|---|
-| newest stable (see PLAN.md — was `26.2` at time of writing) | ✅ | ✅ | n/a (program scope) |
-| 1.21.4 | ✅ | ✅ | n/a (program scope) |
-| 1.20.1 | ✅ | n/a (structural) | ✅ |
-| 1.19.4 | ✅ | n/a (structural) | ✅ |
-| 1.18.2 | ✅ | n/a (structural) | ✅ |
+| `26.3` (newest stable) | ✅ | ✅ | n/a (program scope) |
+| `26.2` | ✅ | ✅ | n/a (program scope) |
+| `26.1.2`, `26.1.1`, `26.1` | ✅ | ✅ | n/a (program scope) |
+| `1.21.11`, `1.21.10`, `1.21.9`, `1.21.8`, `1.21.7`, `1.21.6`, `1.21.5`, `1.21.4`, `1.21.1` | ✅ | ✅ | n/a (program scope) |
+| `1.20.6` | ✅ | ✅ | n/a (program scope) |
+| `1.20.4`, `1.20.1` | ✅ | n/a (structural) | ✅ |
+| `1.19.4` | ✅ | n/a (structural) | ✅ |
+| `1.18.2` | ✅ | n/a (structural) | ✅ |
 
-All 10 targeted cells build green (verified via `chiseledBuild` plus per-jar
-`unzip -l` content checks — see PLAN.md Phase 4). NeoForge does not exist
-before the Forge/NeoForge split at 1.20.2 — that's a structural fact about
-the loader ecosystem, not a scope choice. Forge is not targeted for the two
-newest MC versions per the program's explicit brief (mirrors
-`critical-orientation`'s reasoning) even though Forge itself continues to
-exist in parallel with NeoForge past 1.20.2 — that one is a program-level
-scope decision, recorded as such rather than implied to be a structural
-impossibility. Quilt is not a separate column: it loads `*-fabric` jars
-natively. See PLAN.md "Forgix" section for the still-open plan to merge each
-version's per-loader jars into one combined jar (deferred, Phase 4).
+All 38 targeted cells build green (verified via `./gradlew chiseledBuild`).
+NeoForge does not exist before the Forge/NeoForge split at 1.20.2 — that's a
+structural fact about the loader ecosystem, not a scope choice. Forge is not
+targeted for `1.20.6+` per `minecraft-mod-standards.md` (Fabric+Forge for
+`<=1.20.4`, Fabric+NeoForge for `>=1.20.5`). Quilt is not a separate column: it
+loads `*-fabric` jars natively. See `PLAN.md` "Forgix" section for the
+still-open plan to merge each version's per-loader jars into one combined jar
+(deferred, Phase 4).
 
 ## Porting notes by MC version
 
@@ -417,14 +417,19 @@ removed accordingly (each carries a comment explaining why).
 - **1.20.1 (baseline)**: ✅ builds green under the uniform-Mojmap tree.
   `GuiGraphics` + `GuiGraphics.fill(int,int,int,int,int)` overload used
   directly via `PlatformCanvas`'s "classic" branch.
-- **1.21.4**: ✅ builds green. Real delta from 1.20.1, confirmed via `javap`
-  against the real per-project jar: the HUD-render hook gained a
-  `DeltaTracker` parameter in place of a trailing `float tickDelta` (handled
-  in `HudHooks.register()`'s `fabric && <1.21.2` vs `fabric` branches).
-  `Entity.hasVehicle()` doesn't exist in Mojmap at all — replaced with
-  `player.getVehicle() != null`. Full symbol-rename table (KeyMapping,
-  InputConstants, Options.fov(), Window.getGuiScaledWidth(), etc.) applied;
-  see git history for the full diff.
+- **1.20.6 – 1.21.11**: ✅ builds green (both fabric and neoforge).
+  - `HudHooks`: `DeltaTracker` was introduced in `1.21` (so `1.20.6-neoforge`
+    uses `event.getPartialTick()` returning `float`, and `1.21+` uses
+    `DeltaTracker#getGameTimeDeltaPartialTick(false)`; Fabric's
+    `HudRenderCallback` switched from `float` to `DeltaTracker` at `1.21`,
+    so `fabric && <1.21` vs `fabric`).
+  - `PlatformCanvas`: `GuiGraphics.pose()` switched from `PoseStack` to
+    `org.joml.Matrix3x2fStack` at `1.21.6` (`>=1.21.6` branch inside
+    `PlatformCanvas`'s `GuiGraphics` path).
+  - `1.21.4` real delta from `1.20.1`: `Entity.hasVehicle()` doesn't exist
+    in Mojmap at all — replaced with `player.getVehicle() != null`. Full
+    symbol-rename table (KeyMapping, InputConstants, Options.fov(),
+    Window.getGuiScaledWidth(), etc.) applied; see git history for the full diff.
 - **Newest stable (26.x)**: ✅ builds green (both fabric and neoforge) —
   previously blocked, now resolved architecturally, not via API-churn
   patching. Minecraft moved to year-based versioning (`YY.N`) starting in

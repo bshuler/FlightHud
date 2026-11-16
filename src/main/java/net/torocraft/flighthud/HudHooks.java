@@ -2,7 +2,7 @@ package net.torocraft.flighthud;
 
 //? if fabric && <1.20 {
 /*import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
-*///?} elif fabric && <1.21.2 {
+*///?} elif fabric && <1.21 {
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.gui.GuiGraphics;
 //?} elif fabric && >=26.1 {
@@ -15,9 +15,12 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.GuiGraphics;
 *///?}
-//? if neoforge {
+//? if neoforge && >=1.21 {
 /*import net.minecraft.client.DeltaTracker;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
+import net.neoforged.neoforge.common.NeoForge;
+*///?} elif neoforge {
+/*import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.common.NeoForge;
 *///?} elif forge && <1.19 {
 /*import com.mojang.blaze3d.vertex.PoseStack;
@@ -65,7 +68,7 @@ public final class HudHooks {
     //? if fabric && <1.20 {
     /*HudRenderCallback.EVENT.register((poseStack, tickDelta) ->
         HUD.render(new PlatformCanvas(poseStack), tickDelta, Minecraft.getInstance()));
-    *///?} elif fabric && <1.21.2 {
+    *///?} elif fabric && <1.21 {
     HudRenderCallback.EVENT.register((GuiGraphics context, float tickDelta) ->
         HUD.render(new PlatformCanvas(context), tickDelta, Minecraft.getInstance()));
     //?} elif fabric && >=26.1 {
@@ -77,10 +80,14 @@ public final class HudHooks {
     /*HudRenderCallback.EVENT.register((GuiGraphics context, DeltaTracker deltaTracker) ->
         HUD.render(new PlatformCanvas(context),
             deltaTracker.getGameTimeDeltaPartialTick(false), Minecraft.getInstance()));
-    *///?} elif neoforge {
+    *///?} elif neoforge && >=1.21 {
     /*NeoForge.EVENT_BUS.addListener((RenderGuiEvent.Post event) ->
         HUD.render(new PlatformCanvas(event.getGuiGraphics()),
             event.getPartialTick().getGameTimeDeltaPartialTick(false), Minecraft.getInstance()));
+    *///?} elif neoforge {
+    /*NeoForge.EVENT_BUS.addListener((RenderGuiEvent.Post event) ->
+        HUD.render(new PlatformCanvas(event.getGuiGraphics()),
+            event.getPartialTick(), Minecraft.getInstance()));
     *///?} elif forge && <1.19 {
     /*OverlayRegistry.registerOverlayTop("flighthud",
         (ForgeIngameGui gui, PoseStack poseStack, float tickDelta, int width, int height) ->

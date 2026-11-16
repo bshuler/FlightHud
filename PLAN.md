@@ -39,17 +39,31 @@ Reference config: `github.com/FabricMC/fabric-example-mod` default branch
 
 ## Target matrix
 
-**Status as of 2026-08-10: all 10 mandatory cells build green via
-`./gradlew chiseledBuild`, verified with real (non-empty) jar contents via
-`unzip -l` per cell — not just `BUILD SUCCESSFUL`.**
+**Status as of 2026-11-16: all 38 mandatory cells (19 MC versions × 2 loaders)
+build green via `./gradlew chiseledBuild`, compliant with
+`minecraft-mod-standards.md`.**
 
 | MC version | Fabric | NeoForge | Forge | Forgix merged jar |
 |---|---|---|---|---|
-| 26.2 (newest stable) | ✅ | ✅ | n/a — program scope (see below) | ☐ |
-| 1.21.4 | ✅ | ✅ | n/a — program scope (see below) | ☐ |
-| 1.20.1 | ✅ | n/a — structural, no NeoForge pre-1.20.2 | ✅ | ☐ |
-| 1.19.4 | ✅ | n/a — structural, no NeoForge pre-1.20.2 | ✅ | ☐ |
-| 1.18.2 | ✅ | n/a — structural, no NeoForge pre-1.20.2 | ✅ | ☐ |
+| `26.3` (newest stable) | ✅ | ✅ | n/a — program scope | ☐ |
+| `26.2` | ✅ | ✅ | n/a — program scope | ☐ |
+| `26.1.2` | ✅ | ✅ | n/a — program scope | ☐ |
+| `26.1.1` | ✅ | ✅ | n/a — program scope | ☐ |
+| `26.1` | ✅ | ✅ | n/a — program scope | ☐ |
+| `1.21.11` | ✅ | ✅ | n/a — program scope | ☐ |
+| `1.21.10` | ✅ | ✅ | n/a — program scope | ☐ |
+| `1.21.9` | ✅ | ✅ | n/a — program scope | ☐ |
+| `1.21.8` | ✅ | ✅ | n/a — program scope | ☐ |
+| `1.21.7` | ✅ | ✅ | n/a — program scope | ☐ |
+| `1.21.6` | ✅ | ✅ | n/a — program scope | ☐ |
+| `1.21.5` | ✅ | ✅ | n/a — program scope | ☐ |
+| `1.21.4` | ✅ | ✅ | n/a — program scope | ☐ |
+| `1.21.1` | ✅ | ✅ | n/a — program scope | ☐ |
+| `1.20.6` | ✅ | ✅ | n/a — program scope | ☐ |
+| `1.20.4` | ✅ | n/a — structural, pre-1.20.5 | ✅ | ☐ |
+| `1.20.1` | ✅ | n/a — structural, no NeoForge pre-1.20.2 | ✅ | ☐ |
+| `1.19.4` | ✅ | n/a — structural, no NeoForge pre-1.20.2 | ✅ | ☐ |
+| `1.18.2` | ✅ | n/a — structural, no NeoForge pre-1.20.2 | ✅ | ☐ |
 
 Quilt: no separate column — every `*-fabric` jar is Quilt-compatible as-is
 (Quilt loads Fabric mod jars natively). Documented, not built separately.
